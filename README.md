@@ -16,7 +16,22 @@ Synth is a research intelligence backend that uses an LLM to extract structured 
 - [x] End-to-end testing of both input paths
 - [x] Level 0 GitHub milestone, pull request, and release tag
 
-PostgreSQL, authentication, persistent storage, automated tests, and production deployment are planned for later stages.
+**Level 1 — PostgreSQL: In progress** (milestone *Level 01 — PostgreSQL*, issue [#7](https://github.com/jitmandal001/synth/issues/7))
+
+Synth does not store anything yet: every paper and extraction is discarded once the response is sent. Level 1 adds a database so they survive restarts and later levels can build on them.
+
+- [ ] Install PostgreSQL and create the `synth` database
+- [ ] Async database connection with SQLAlchemy 2.0
+- [ ] Tables: `users` (stub), `sources`, `documents`, `extractions`
+- [ ] Alembic migrations
+- [ ] Store arXiv metadata (title, category, authors) with each document
+- [ ] Save every extraction with the model used, token counts, and latency
+- [ ] `GET /documents?category=...` and `GET /documents/{id}`
+- [ ] Add `review_status` to `extractions` in three migrations (nullable → backfill → NOT NULL)
+
+Exit condition: the app survives a restart with zero data loss, and `alembic upgrade head` and `alembic downgrade -1` both run cleanly on a fresh database.
+
+Authentication, automated tests, and production deployment are planned for later levels.
 
 ## Technology Stack
 
@@ -34,7 +49,10 @@ PostgreSQL, authentication, persistent storage, automated tests, and production 
 synth/
 ├── main.py
 ├── requirements.txt
+├── .env.example
 ├── .gitignore
+├── first-merge.html
+├── README.md
 └── services/
     ├── __init__.py
     ├── arxiv.py
@@ -47,24 +65,34 @@ synth/
 - `services/arxiv.py` — fetches and parses abstracts from arXiv.
 - `services/extraction.py` — calls OpenRouter and validates the generated summary and key entities.
 - `requirements.txt` — records Python dependencies.
+- `.env.example` — template listing the environment variables Synth needs; copy it to `.env`.
 - `.gitignore` — excludes local environments, secrets, and generated files from Git.
+- `first-merge.html` — a click-through walkthrough of the Git and GitHub workflow used in this repository (issue → branch → commit → push → pull request → merge → pull). Open it in a browser; GitHub displays `.html` files as source code.
+
+Two folders and files exist only on your machine and are never committed: `.venv/` (the virtual environment) and `.env` (your API key).
 
 ## Setup
 
 ### 1. Create and activate a virtual environment
-
-**macOS — PowerShell:**
-
-```powershell
-python -m venv .venv
-./.venv/bin/Activate.ps1
-```
 
 **Windows — PowerShell:**
 
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
+```
+
+If PowerShell refuses to run `Activate.ps1`, allow local scripts once and try again:
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+**macOS / Linux — bash or zsh:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
 ```
 
 ### 2. Install dependencies
@@ -79,13 +107,17 @@ python -m pip install -r requirements.txt
 
 Create an API key through [OpenRouter](https://openrouter.ai/keys).
 
-Create a file named `.env` in the project root containing:
+Copy the template to create your own `.env` file:
 
-```text
-OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY
+```powershell
+Copy-Item .env.example .env
 ```
 
-`.env` is gitignored. Keep your key private. Do not hardcode it in Python files or commit it to GitHub.
+On macOS or Linux, use `cp .env.example .env`.
+
+Open `.env` and replace the placeholder value of `OPENROUTER_API_KEY` with your key.
+
+`.env` is gitignored. Keep your key private. Do not hardcode it in Python files, put it in `.env.example`, or commit it to GitHub.
 
 The application currently uses OpenRouter's `openrouter/free` model router. Eligible free models may be subject to availability and rate limits.
 
@@ -202,8 +234,8 @@ The API validates incoming requests and may return errors when:
 
 | Level | Focus | Status |
 |---|---|---|
-| 0 | FastAPI baseline, arXiv retrieval, and LLM extraction | Complete |
-| 1 | PostgreSQL, SQLAlchemy, Alembic, persistent state | Planned |
+| 0 | FastAPI baseline, arXiv retrieval, and LLM extraction | Complete (`v0.0-baseline`) |
+| 1 | PostgreSQL, SQLAlchemy, Alembic, persistent state | In progress ([#7](https://github.com/jitmandal001/synth/issues/7)) |
 | 2 | Modular FastAPI architecture and configuration | Planned |
 | 3 | Authentication and role-based access control | Planned |
 | 4 | Automated testing, logging, and CI | Planned |
@@ -212,24 +244,49 @@ The API validates incoming requests and may return errors when:
 
 ## Development Workflow
 
-Start the application from the project root:
+Every change goes through an issue, a branch, and a pull request, so `main` always holds working code.
 
-```powershell
-python -m uvicorn main:app --reload --env-file .env
-```
+1. **Open an issue** describing the change. Roadmap levels go under that level's milestone; small standalone fixes get a label such as `documentation` or `bug` instead.
 
-After making changes, test the relevant endpoints through `/docs`.
+2. **Start a branch from an up-to-date `main`:**
 
-Commit working changes using descriptive messages:
+   ```powershell
+   git checkout main
+   git pull
+   git checkout -b level-1-postgres
+   ```
 
-```powershell
-git add main.py services/ requirements.txt README.md
-git commit -m "Update Synth baseline documentation"
-git push
-```
+3. **Make small commits**, one per sub-step:
 
-Do not commit `.venv/`, API keys, or other secrets.
+   ```powershell
+   git add <files>
+   git commit -m "Add async database session"
+   ```
+
+4. **Push the branch:**
+
+   ```powershell
+   git push -u origin level-1-postgres
+   ```
+
+5. **Open a pull request** into `main` on GitHub. Put `Closes #<issue number>` in the description, and say what changed and how it was tested.
+
+6. **Merge** with *Create a merge commit*, then bring your local `main` up to date:
+
+   ```powershell
+   git checkout main
+   git pull
+   ```
+
+7. **At the end of each level**, tag the merge commit and push the tag:
+
+   ```powershell
+   git tag -a v0.1-postgres -m "Level 1: PostgreSQL"
+   git push origin v0.1-postgres
+   ```
+
+Before opening a pull request, run the app and test the relevant endpoints through `/docs`. Never commit `.venv/`, `.env`, API keys, or other secrets.
 
 ---
 
-**Synth is being developed incrementally.** Level 0 is complete; the next step is Level 1, persistent storage with PostgreSQL.
+**Synth is being developed incrementally.** Level 0 is complete (`v0.0-baseline`); Level 1, persistent storage with PostgreSQL, is in progress.
