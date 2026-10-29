@@ -1,6 +1,7 @@
 
 from urllib.request import urlopen
 from urllib.parse import urlencode
+from urllib.error import HTTPError
 from xml.etree import ElementTree as ET
 
 from fastapi import HTTPException
@@ -44,6 +45,17 @@ def fetch_arxiv_abstract(arxiv_id: str) -> str:
 
     except HTTPException:
         raise
+    except HTTPError as exc:
+        # arXiv rejects malformed IDs with a 400.
+        if exc.code == 400:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid arXiv ID format.",
+            ) from exc
+        raise HTTPException(
+            status_code=502,
+            detail="Could not fetch the abstract from arXiv.",
+        ) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=502,

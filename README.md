@@ -4,7 +4,7 @@ Synth is a research intelligence backend that uses an LLM to extract structured 
 
 ## Current Progress
 
-**Level 0 — Baseline: In progress**
+**Level 0 — Baseline: Complete** (tagged `v0.0-baseline`)
 
 - [x] FastAPI application setup
 - [x] Health-check and home endpoints
@@ -12,8 +12,9 @@ Synth is a research intelligence backend that uses an LLM to extract structured 
 - [x] LLM-based summary and key entity extraction using OpenRouter
 - [x] Fetching research abstracts from the arXiv API
 - [x] Structured JSON responses validated with Pydantic
-- [ ] Complete testing of both input paths
-- [ ] Finalize Level 0 and its GitHub milestone
+- [x] Retry when the free model returns empty or non-JSON output
+- [x] End-to-end testing of both input paths
+- [x] Level 0 GitHub milestone, pull request, and release tag
 
 PostgreSQL, authentication, persistent storage, automated tests, and production deployment are planned for later stages.
 
@@ -68,30 +69,23 @@ python -m venv .venv
 
 ### 2. Install dependencies
 
-For a new environment:
-
 ```powershell
 python -m pip install -r requirements.txt
 ```
 
-If setting up dependencies for the first time, install the required packages:
-
-```powershell
-python -m pip install fastapi "uvicorn[standard]" openai
-python -m pip freeze > requirements.txt
-```
+`requirements.txt` lists only the packages Synth imports directly. When adding a dependency, add its pinned line by hand instead of running `pip freeze`, which records platform-specific packages (such as `uvloop`, which does not install on Windows).
 
 ### 3. Configure OpenRouter
 
-Create an API key through [OpenRouter](https://openrouter.ai/).
+Create an API key through [OpenRouter](https://openrouter.ai/keys).
 
-Set the key in your current PowerShell session:
+Create a file named `.env` in the project root containing:
 
-```powershell
-$env:OPENROUTER_API_KEY = "YOUR_OPENROUTER_API_KEY"
+```text
+OPENROUTER_API_KEY=YOUR_OPENROUTER_API_KEY
 ```
 
-Keep your key private. Do not hardcode it in Python files or commit it to GitHub.
+`.env` is gitignored. Keep your key private. Do not hardcode it in Python files or commit it to GitHub.
 
 The application currently uses OpenRouter's `openrouter/free` model router. Eligible free models may be subject to availability and rate limits.
 
@@ -100,7 +94,7 @@ The application currently uses OpenRouter's `openrouter/free` model router. Elig
 From the project root:
 
 ```powershell
-python -m uvicorn main:app --reload
+python -m uvicorn main:app --reload --env-file .env
 ```
 
 The API will be available at:
@@ -189,10 +183,11 @@ The example values are illustrative; actual output depends on the abstract and s
 The API validates incoming requests and may return errors when:
 
 - Neither input field is supplied, or both are supplied.
-- The arXiv paper cannot be retrieved.
+- The arXiv ID is malformed (`400`) or matches no paper (`404`).
+- arXiv cannot be reached (`502`).
 - The OpenRouter API key is missing or invalid.
 - The selected free model is unavailable or rate-limited.
-- The LLM response is empty or does not match the expected schema.
+- The LLM response is empty or does not match the expected schema on all three attempts. `openrouter/free` may route each attempt to a different free model.
 
 ## Current Limitations
 
@@ -207,7 +202,7 @@ The API validates incoming requests and may return errors when:
 
 | Level | Focus | Status |
 |---|---|---|
-| 0 | FastAPI baseline, arXiv retrieval, and LLM extraction | In progress |
+| 0 | FastAPI baseline, arXiv retrieval, and LLM extraction | Complete |
 | 1 | PostgreSQL, SQLAlchemy, Alembic, persistent state | Planned |
 | 2 | Modular FastAPI architecture and configuration | Planned |
 | 3 | Authentication and role-based access control | Planned |
@@ -220,7 +215,7 @@ The API validates incoming requests and may return errors when:
 Start the application from the project root:
 
 ```powershell
-python -m uvicorn main:app --reload
+python -m uvicorn main:app --reload --env-file .env
 ```
 
 After making changes, test the relevant endpoints through `/docs`.
@@ -237,4 +232,4 @@ Do not commit `.venv/`, API keys, or other secrets.
 
 ---
 
-**Synth is being developed incrementally.** The current priority is to verify and complete Level 0 before introducing persistent storage in Level 1.
+**Synth is being developed incrementally.** Level 0 is complete; the next step is Level 1, persistent storage with PostgreSQL.
