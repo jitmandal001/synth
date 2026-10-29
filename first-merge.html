@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}</style>
+<title>Your First Merge</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: header, then a two-column grid (step rail | stage). The stage is the step card on top, then two repo panels (Your PC | GitHub) joined by a transfer arrow. Everything stacks to one column on phones. */
+:root{
+  --bg:#F2F4F7;
+  --surface:#FFFFFF;
+  --ink:#17202C;
+  --muted:#586377;
+  --line:#D7DDE6;
+  --code-bg:#EBEEF3;
+  --main:#2D5BA6;
+  --branch:#B5650B;
+  --merged:#7647BF;
+  --ok:#1B7F45;
+  --warn:#B0441A;
+  --on-solid:#FFFFFF;
+  --font-body:"IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-mono:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E131A; --surface:#161D27; --ink:#E5E9EF; --muted:#9AA4B3; --line:#2A3443; --code-bg:#0A0F15;
+    --main:#77A2EA; --branch:#E59D44; --merged:#AD8AEB; --ok:#55C786; --warn:#EE8358; --on-solid:#0E131A;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E131A; --surface:#161D27; --ink:#E5E9EF; --muted:#9AA4B3; --line:#2A3443; --code-bg:#0A0F15;
+  --main:#77A2EA; --branch:#E59D44; --merged:#AD8AEB; --ok:#55C786; --warn:#EE8358; --on-solid:#0E131A;
+  color-scheme:dark;
+}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:15px;line-height:1.55}
+.wrap{max-width:1140px;margin:0 auto;padding-block:28px 56px;padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.eyebrow{font-family:var(--font-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+h1{font-size:28px;line-height:1.2;font-weight:600;margin:6px 0 8px;text-wrap:balance;letter-spacing:-.01em}
+.lede{margin:0;color:var(--muted);max-width:68ch}
+code{font-family:var(--font-mono);font-size:.88em;background:var(--code-bg);padding:1px 5px;border-radius:4px;color:var(--ink)}
+
+.layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:28px;margin-top:26px;align-items:start}
+
+/* Step rail */
+.rail{position:sticky;top:calc(env(safe-area-inset-top, 0px) + 16px)}
+.rail ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.rail button{all:unset;box-sizing:border-box;display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;align-items:center;width:100%;padding:7px 10px;border-radius:8px;cursor:pointer}
+.rail button:hover{background:var(--code-bg)}
+.rail button:focus-visible{outline:2px solid var(--main);outline-offset:1px}
+.rail .num{font-family:var(--font-mono);font-size:12px;font-weight:600;width:30px;height:24px;border-radius:6px;display:grid;place-items:center;border:1px solid var(--line);color:var(--muted)}
+.rail .done .num{border-color:transparent;background:var(--code-bg);color:var(--ink)}
+.rail .next .num{border-style:dashed}
+.rail .name{display:block;font-weight:500;font-size:14px;line-height:1.25}
+.rail .where{display:block;font-size:12px;color:var(--muted)}
+.rail button[aria-current="step"]{background:var(--surface);box-shadow:0 0 0 1px var(--line)}
+.rail button[aria-current="step"] .num{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.here{margin:6px 0 6px 10px;font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--warn);display:flex;align-items:center;gap:8px;white-space:nowrap}
+.here::before{content:"";width:16px;height:2px;background:var(--warn)}
+
+/* Step card */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:20px 22px}
+.step-top{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px}
+.card h2{font-size:22px;line-height:1.25;font-weight:600;margin:6px 0 10px;text-wrap:balance}
+.card p{margin:0 0 14px;max-width:70ch}
+.cmds{display:flex;flex-direction:column;gap:6px;margin:0 0 16px}
+.cmd{display:flex;align-items:center;gap:8px;background:var(--code-bg);border-radius:8px;padding:7px 8px 7px 12px;min-width:0}
+.cmd code{background:none;padding:0;font-size:13.5px;flex:1;min-width:0;overflow-x:auto;white-space:pre}
+.cmd code::before{content:"PS> ";color:var(--muted)}
+.copy{all:unset;cursor:pointer;font-family:var(--font-mono);font-size:12px;padding:4px 9px;border-radius:6px;border:1px solid var(--line);color:var(--muted);background:var(--surface)}
+.copy:focus-visible{outline:2px solid var(--main)}
+.changes{list-style:none;margin:0;padding:12px 0 0;border-top:1px solid var(--line);display:grid;gap:6px}
+.changes li{display:grid;grid-template-columns:72px minmax(0,1fr);gap:10px;font-size:14px}
+.changes .side{font-family:var(--font-mono);font-size:12px;color:var(--muted);padding-top:2px}
+.changes .quiet{color:var(--muted)}
+
+.chip{font-family:var(--font-mono);font-size:11.5px;padding:2px 8px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.chip.ok{color:var(--ok)}
+.chip.warn{color:var(--warn)}
+.chip.ahead{color:var(--branch)}
+
+/* Repo panels */
+.repos{display:grid;grid-template-columns:minmax(0,1fr) 76px minmax(0,1fr);margin-top:18px;align-items:stretch}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:14px 16px 16px;min-width:0;display:flex;flex-direction:column;gap:12px}
+.panel-head{display:flex;justify-content:space-between;align-items:flex-start;gap:8px;flex-wrap:wrap}
+.panel h3{margin:0;font-size:16px;font-weight:600}
+.loc{display:block;font-family:var(--font-mono);font-size:11.5px;color:var(--muted);overflow-wrap:anywhere}
+.graph{overflow-x:auto;margin:0 -4px}
+.graph svg{display:block;width:100%;min-width:290px;height:auto}
+.meta{font-size:13px;color:var(--muted);display:grid;gap:3px}
+.meta b{color:var(--ink);font-weight:500;font-family:var(--font-mono);font-size:12.5px}
+.meta .warn{color:var(--warn)}
+.label{font-family:var(--font-mono);font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.files{display:flex;flex-wrap:wrap;gap:5px}
+.file{font-family:var(--font-mono);font-size:11.5px;padding:2px 7px;border-radius:5px;background:var(--code-bg);color:var(--muted)}
+.file.new{background:transparent;color:var(--merged);box-shadow:inset 0 0 0 1.5px var(--merged);font-weight:600}
+.items{display:grid;gap:6px}
+.item{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13.5px}
+.item .t{min-width:0}
+.state{font-family:var(--font-mono);font-size:11px;padding:2px 8px;border-radius:999px;color:var(--on-solid);white-space:nowrap}
+.state.open{background:var(--ok)}
+.state.closed,.state.merged{background:var(--merged)}
+.empty{font-size:13px;color:var(--muted)}
+
+.transfer{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-family:var(--font-mono);font-size:11.5px;line-height:1.3;text-align:center;padding:0 4px}
+.transfer .arrow{font-size:28px;line-height:1;font-family:var(--font-body)}
+.transfer.idle .arrow{color:var(--line)}
+.transfer.push{color:var(--ink)}
+.transfer.push .arrow{color:var(--branch)}
+.transfer.pull{color:var(--ink)}
+.transfer.pull .arrow{color:var(--main)}
+.transfer .v{display:none}
+
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:12px;font-size:12.5px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:10px;height:10px;border-radius:50%;display:inline-block}
+.sw.main{background:var(--main)}
+.sw.branch{background:var(--branch)}
+.sw.merge{background:var(--merged)}
+.pl{font-family:var(--font-mono);font-size:10.5px;padding:0 6px;border-radius:9px;border:1.5px solid var(--main);color:var(--main)}
+.pl.solid{background:var(--main);color:var(--on-solid)}
+.pl.tag{border-color:var(--ink);color:var(--ink);border-style:dashed}
+
+.nav{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-top:16px;flex-wrap:wrap}
+.nav .btns{display:flex;gap:8px}
+.btn{all:unset;cursor:pointer;font-weight:500;font-size:14px;padding:9px 16px;border-radius:8px;border:1px solid var(--line);background:var(--surface);color:var(--ink)}
+.btn.primary{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.btn[disabled]{opacity:.4;cursor:default}
+.btn:focus-visible{outline:2px solid var(--main);outline-offset:2px}
+.hint{font-size:12.5px;color:var(--muted)}
+
+/* Commit graph */
+.edge{fill:none;stroke-width:3;stroke-linecap:round}
+.edge.main{stroke:var(--main)}
+.edge.branch{stroke:var(--branch)}
+.edge.older{stroke:var(--muted);stroke-dasharray:2 6;opacity:.6}
+.dot{stroke:var(--surface);stroke-width:3}
+.dot.main{fill:var(--main)}
+.dot.branch{fill:var(--branch)}
+.dot.merge{fill:var(--merged)}
+.hash{font-family:var(--font-mono);font-size:10.5px;fill:var(--muted);text-anchor:middle}
+.note{font-family:var(--font-body);font-size:11px;fill:var(--merged);text-anchor:middle;font-style:italic}
+.pill rect{stroke-width:1.5}
+.pill text{font-family:var(--font-mono);font-size:10.5px;font-weight:500;text-anchor:middle;dominant-baseline:central}
+.pill.r-main rect{stroke:var(--main);fill:var(--surface)}
+.pill.r-main text{fill:var(--main)}
+.pill.r-branch rect{stroke:var(--branch);fill:var(--surface)}
+.pill.r-branch text{fill:var(--branch)}
+.pill.r-tag rect{stroke:var(--ink);fill:var(--surface);stroke-dasharray:3 2}
+.pill.r-tag text{fill:var(--ink)}
+.pill.head.r-main rect{fill:var(--main)}
+.pill.head.r-main text{fill:var(--on-solid)}
+.pill.head.r-branch rect{fill:var(--branch)}
+.pill.head.r-branch text{fill:var(--on-solid)}
+.ring{fill:none;stroke-width:2;transform-box:fill-box;transform-origin:center}
+.ring.main{stroke:var(--main)}
+.ring.branch{stroke:var(--branch)}
+.ring.merge{stroke:var(--merged)}
+.pill{transform-box:fill-box;transform-origin:center}
+@media (prefers-reduced-motion: no-preference){
+  .ring{animation:pulse 1.4s ease-out 2}
+  .pill.fresh,.file.new.fresh{animation:pop .45s ease-out}
+}
+@keyframes pulse{from{transform:scale(1);opacity:1}to{transform:scale(1.9);opacity:0}}
+@keyframes pop{from{transform:scale(.8);opacity:.2}to{transform:scale(1);opacity:1}}
+
+@media (max-width:880px){
+  .layout{grid-template-columns:minmax(0,1fr)}
+  .rail{position:static;overflow-x:auto;padding-bottom:4px}
+  .rail ol{flex-direction:row;width:max-content;align-items:center}
+  .rail button{grid-template-columns:auto;justify-items:start;gap:4px;width:auto;min-width:104px}
+  .rail .where{display:none}
+  .here{margin:0 6px}
+}
+@media (max-width:640px){
+  .repos{grid-template-columns:minmax(0,1fr)}
+  .transfer{flex-direction:row;padding:10px 0;gap:10px}
+  .transfer .h{display:none}
+  .transfer .v{display:inline}
+  .card{padding:16px}
+  .changes li{grid-template-columns:minmax(0,1fr);gap:0}
+}
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">synth · issue #3 → pull request #4</div>
+    <h1>How your change got into main</h1>
+    <p class="lede">Follow your <code>.env.example</code> change from your PC to GitHub, one step at a time. The left panel is your PC and the right panel is GitHub. Each dot is a commit, and each label is a branch name pointing at a commit. Click a step or use the arrow keys.</p>
+  </header>
+
+  <div class="layout">
+    <nav class="rail" aria-label="Steps"><ol id="rail"></ol></nav>
+
+    <main>
+      <section class="card" id="card" aria-live="polite"></section>
+
+      <div class="repos">
+        <section class="panel" id="pc" aria-label="Your PC"></section>
+        <div class="transfer" id="transfer"></div>
+        <section class="panel" id="gh" aria-label="GitHub"></section>
+      </div>
+
+      <div class="legend" aria-label="Legend">
+        <span><i class="sw main"></i>main line</span>
+        <span><i class="sw branch"></i>add-env-example line</span>
+        <span><i class="sw merge"></i>merge commit</span>
+        <span><i class="pl solid">main</i>branch you're on</span>
+        <span><i class="pl tag">tag</i>tag</span>
+      </div>
+
+      <div class="nav">
+        <div class="btns">
+          <button class="btn" id="prev" type="button">← Back</button>
+          <button class="btn primary" id="next" type="button">Next →</button>
+        </div>
+        <span class="hint">You can also use the ← → keys.</span>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const FILES = ['.gitignore', 'README.md', 'main.py', 'requirements.txt', 'services/'];
+const POS = {
+  'b3c93c4': { x: 44, lane: 'main' },
+  'cadf764': { x: 128, lane: 'main' },
+  '12efa97': { x: 218, lane: 'branch' },
+  '095ea33': { x: 306, lane: 'main' },
+};
+const Y = { main: 80, branch: 142 };
+const EDGES = [
+  ['b3c93c4', 'cadf764', 'main'],
+  ['cadf764', '12efa97', 'branch'],
+  ['12efa97', '095ea33', 'branch'],
+  ['cadf764', '095ea33', 'main'],
+];
+const BASE = ['b3c93c4', 'cadf764'];
+const isTag = n => /^v\d/.test(n);
+
+// Side states, built step by step.
+const pc0 = { commits: BASE, refs: { main: 'cadf764' }, head: 'main', folder: 'clean', envOnMain: false };
+const gh0 = { commits: BASE, refs: { main: 'cadf764' }, issue: null, pr: null, envOnMain: false };
+const gh1 = { ...gh0, issue: 'open' };
+const pc2 = { ...pc0, refs: { main: 'cadf764', 'add-env-example': 'cadf764' }, head: 'add-env-example' };
+const pc3 = { ...pc2, folder: 'untracked' };
+const pc4 = { commits: [...BASE, '12efa97'], refs: { main: 'cadf764', 'add-env-example': '12efa97' }, head: 'add-env-example', folder: 'clean', envOnMain: false };
+const gh5 = { commits: [...BASE, '12efa97'], refs: { main: 'cadf764', 'add-env-example': '12efa97' }, issue: 'open', pr: null, envOnMain: false };
+const gh6 = { ...gh5, pr: 'open' };
+const gh7 = { commits: [...BASE, '12efa97', '095ea33'], refs: { main: '095ea33', 'add-env-example': '12efa97' }, issue: 'closed', pr: 'merged', envOnMain: true };
+const pc8 = { commits: [...BASE, '12efa97', '095ea33'], refs: { main: '095ea33', 'add-env-example': '12efa97' }, head: 'main', folder: 'clean', envOnMain: true };
+const pc9 = { ...pc8, refs: { ...pc8.refs, 'v0.0.1': '095ea33' } };
+const gh9 = { ...gh7, refs: { ...gh7.refs, 'v0.0.1': '095ea33' } };
+
+const STEPS = [
+  { n: 0, name: 'Start', where: '', status: 'done', title: 'Where you started',
+    text: 'Level 0 was already merged. Your PC and GitHub had the same <code>main</code> branch, ending at commit <code>cadf764</code>. The dotted line on the left stands for older commits.',
+    changes: [['Both', 'Nothing has changed yet. Both sides match.']],
+    pc: pc0, gh: gh0 },
+  { n: 1, name: 'Create issue #3', where: 'GitHub website', status: 'done', title: 'Create issue #3',
+    text: "An issue is a to-do note on GitHub. Yours says new users don't know which key Synth needs. Creating it doesn't change any code, so neither commit graph moves.",
+    changes: [['GitHub', 'Issue #3 opened.'], ['Your PC', null]],
+    pc: pc0, gh: gh1 },
+  { n: 2, name: 'Create a branch', where: 'Terminal', status: 'done', title: 'Create a branch',
+    cmds: ['git checkout -b add-env-example'],
+    text: "A branch is just a label that points at a commit. The new label <code>add-env-example</code> starts on the same commit as <code>main</code>, and you switch to it. The solid label shows the branch you're on. There's no new commit yet, and GitHub doesn't know this branch exists.",
+    changes: [['Your PC', 'New label add-env-example on cadf764. You are now on it.'], ['GitHub', null]],
+    pc: pc2, gh: gh1 },
+  { n: 3, name: 'Create the file', where: 'VS Code', status: 'done', title: 'Create .env.example',
+    text: "The file now exists in your folder, but git hasn't saved it in any commit. <code>git status</code> lists it as untracked. The graph doesn't change until you commit.",
+    changes: [['Your PC', 'New file in the folder, not committed yet.'], ['GitHub', null]],
+    pc: pc3, gh: gh1 },
+  { n: 4, name: 'Commit', where: 'Terminal', status: 'done', title: 'Commit',
+    cmds: ['git add .env.example', 'git commit -m "ADD .env.example template"'],
+    text: '<code>git add</code> picks the file and <code>git commit</code> saves a snapshot: commit <code>12efa97</code>. The <code>add-env-example</code> label moves forward to it, while <code>main</code> stays on <code>cadf764</code>. This commit exists only on your PC.',
+    changes: [['Your PC', 'New commit 12efa97. add-env-example moves to it. main does not move.'], ['GitHub', null]],
+    pc: pc4, gh: gh1 },
+  { n: 5, name: 'Push', where: 'Terminal', status: 'done', title: 'Push',
+    cmds: ['git push -u origin add-env-example'], transfer: 'push',
+    text: "Push uploads your branch and its commit to GitHub. GitHub now has <code>add-env-example</code> too, but its <code>main</code> hasn't changed. That's why GitHub showed the yellow <em>Compare &amp; pull request</em> banner: the branch has something <code>main</code> doesn't.",
+    changes: [['GitHub', 'Receives branch add-env-example with commit 12efa97. main unchanged.'], ['Your PC', 'Nothing. It already had the commit.']],
+    pc: pc4, gh: gh5 },
+  { n: 6, name: 'Open pull request', where: 'GitHub website', status: 'done', title: 'Open pull request #4',
+    text: 'A pull request asks: please add the commits from <code>add-env-example</code> into <code>main</code>. The <em>Files changed</em> tab shows the exact lines so they can be reviewed. Opening it changes nothing in <code>main</code> yet.',
+    changes: [['GitHub', 'PR #4 opened: add-env-example → main. main unchanged.'], ['Your PC', null]],
+    pc: pc4, gh: gh6 },
+  { n: 7, name: 'Merge', where: 'GitHub website', status: 'done', title: 'Merge pull request #4',
+    text: "<strong>Merged means GitHub's <code>main</code> now includes your commit.</strong> GitHub created a merge commit, <code>095ea33</code>, that joins two lines of history: the old <code>main</code> (<code>cadf764</code>) and your work (<code>12efa97</code>). The <code>main</code> label moved forward to it, so <code>main</code> now contains <code>.env.example</code>. Because the PR said <code>Closes #3</code>, the issue closed itself. Your PC doesn't know about any of this yet.",
+    changes: [['GitHub', 'New merge commit 095ea33. main moves to it. PR #4 merged, issue #3 closed.'], ['Your PC', 'Nothing. It is now 1 commit behind GitHub.']],
+    pc: pc4, gh: gh7 },
+  { n: 8, name: 'Pull', where: 'Terminal', status: 'next', title: 'Pull',
+    cmds: ['git checkout main', 'git pull'], transfer: 'pull',
+    text: '<code>git checkout main</code> switches you back to <code>main</code>. <code>git pull</code> downloads merge commit <code>095ea33</code> from GitHub and moves your <code>main</code> label forward to it. After this, your PC and GitHub match again, and <code>.env.example</code> is on <code>main</code> on both.',
+    changes: [['Your PC', 'Receives 095ea33. main moves to it. You are on main.'], ['GitHub', null]],
+    pc: pc8, gh: gh7 },
+  { n: 9, name: 'Tag (optional)', where: 'Terminal', status: 'next', title: 'Tag (optional)',
+    cmds: ['git tag -a v0.0.1 -m "Add .env.example template"', 'git push origin v0.0.1'], transfer: 'push',
+    text: 'A tag is a bookmark on one commit. Unlike a branch label, it never moves. <code>git tag</code> creates it on your PC and <code>git push origin v0.0.1</code> uploads it, so <code>v0.0.1</code> always means this exact version.',
+    changes: [['Your PC', 'Tag v0.0.1 on 095ea33.'], ['GitHub', 'Receives tag v0.0.1.']],
+    pc: pc9, gh: gh9 },
+];
+const LAST_DONE = 7;
+
+const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function pill(name, x, y, cls) {
+  const label = isTag(name) ? 'tag ' + name : name;
+  const w = label.length * 6.6 + 16, h = 18;
+  return `<g class="pill ${cls}"><rect x="${x - w / 2}" y="${y - h / 2}" width="${w}" height="${h}" rx="9"></rect><text x="${x}" y="${y + 0.5}">${esc(label)}</text></g>`;
+}
+
+function graph(side, st, prev) {
+  let s = `<path class="edge older" d="M6 ${Y.main} L${POS['b3c93c4'].x - 10} ${Y.main}"/>`;
+  for (const [a, b, lane] of EDGES) {
+    if (!st.commits.includes(a) || !st.commits.includes(b)) continue;
+    const A = POS[a], B = POS[b], y1 = Y[A.lane], y2 = Y[B.lane];
+    const d = y1 === y2 ? `M${A.x} ${y1} L${B.x} ${y2}` : `M${A.x} ${y1} C${A.x + 46} ${y1}, ${B.x - 46} ${y2}, ${B.x} ${y2}`;
+    s += `<path class="edge ${lane}" d="${d}"/>`;
+  }
+  for (const c of st.commits) {
+    const p = POS[c], y = Y[p.lane];
+    const kind = c === '095ea33' ? 'merge' : p.lane;
+    if (prev && !prev.commits.includes(c)) s += `<circle class="ring ${kind}" cx="${p.x}" cy="${y}" r="14"/>`;
+    s += `<circle class="dot ${kind}" cx="${p.x}" cy="${y}" r="8"/>`;
+    s += `<text class="hash" x="${p.x}" y="${p.lane === 'main' ? y - 16 : y + 23}">${c}</text>`;
+    if (c === '095ea33') s += `<text class="note" x="${p.x}" y="${y + 25}">merge commit</text>`;
+  }
+  const groups = {};
+  for (const [name, c] of Object.entries(st.refs)) (groups[c] = groups[c] || []).push(name);
+  for (const [c, names] of Object.entries(groups)) {
+    const p = POS[c], y = Y[p.lane];
+    const above = names.filter(n => n === 'main' || isTag(n)).sort(a => (a === 'main' ? -1 : 1));
+    const below = names.filter(n => n !== 'main' && !isTag(n));
+    const cls = n => {
+      const kind = isTag(n) ? 'r-tag' : n === 'main' ? 'r-main' : 'r-branch';
+      const head = side === 'pc' && st.head === n ? ' head' : '';
+      const fresh = prev && prev.refs[n] !== st.refs[n] ? ' fresh' : '';
+      return kind + head + fresh;
+    };
+    above.forEach((n, i) => { s += pill(n, p.x, y - 38 - i * 22, cls(n)); });
+    below.forEach((n, i) => { s += pill(n, p.x, (p.lane === 'main' ? y + 26 : y + 44) + i * 22, cls(n)); });
+  }
+  const refText = Object.entries(st.refs).map(([n, c]) => `${n} points to ${c}`).join(', ');
+  const who = side === 'pc' ? 'Your PC' : 'GitHub';
+  return `<svg viewBox="0 0 360 200" role="img" aria-label="${who} commit graph. Commits: ${st.commits.join(', ')}. ${refText}.">${s}</svg>`;
+}
+
+function filesBlock(st, prev) {
+  const list = FILES.map(f => `<span class="file">${f}</span>`);
+  if (st.envOnMain) list.push(`<span class="file new${prev && !prev.envOnMain ? ' fresh' : ''}">.env.example</span>`);
+  return `<div><div class="label">Files on main</div><div class="files">${list.join('')}</div></div>`;
+}
+
+function pcStatus(pc, gh) {
+  const ghOnly = gh.commits.filter(c => !pc.commits.includes(c)).length;
+  const pcOnly = pc.commits.filter(c => !gh.commits.includes(c)).length;
+  const pcBranches = Object.keys(pc.refs).filter(n => !isTag(n));
+  const ghBranches = Object.keys(gh.refs).filter(n => !isTag(n));
+  if (ghOnly) return `<span class="chip warn">Behind GitHub by ${ghOnly} commit</span>`;
+  if (pcOnly) return `<span class="chip ahead">${pcOnly} commit not on GitHub yet</span>`;
+  if (pcBranches.some(n => !ghBranches.includes(n))) return `<span class="chip ahead">Branch not on GitHub yet</span>`;
+  return `<span class="chip ok">Matches GitHub</span>`;
+}
+
+let current = 0;
+
+function render() {
+  const st = STEPS[current], prev = current > 0 ? STEPS[current - 1] : null;
+
+  // Rail
+  document.querySelectorAll('#rail button').forEach((b, i) => {
+    if (i === current) b.setAttribute('aria-current', 'step'); else b.removeAttribute('aria-current');
+  });
+
+  // Card
+  const statusChip = st.status === 'done'
+    ? '<span class="chip ok">You did this</span>'
+    : '<span class="chip ahead">Your next step</span>';
+  const eyebrow = st.n === 0 ? 'Starting point' : `Step ${st.n} of 9${st.where ? ' · ' + st.where : ''}`;
+  const cmds = (st.cmds || []).map((c, i) =>
+    `<div class="cmd"><code id="cmd-${current}-${i}">${esc(c)}</code><button class="copy" type="button" data-cmd="${esc(c)}">Copy</button></div>`).join('');
+  const changes = st.changes.map(([side, t]) =>
+    `<li><span class="side">${side}</span><span class="${t ? '' : 'quiet'}">${t ? esc(t) : 'Nothing.'}</span></li>`).join('');
+  document.getElementById('card').innerHTML = `
+    <div class="step-top"><span class="eyebrow">${eyebrow}</span>${statusChip}</div>
+    <h2>${esc(st.title)}</h2>
+    <p>${st.text}</p>
+    ${cmds ? `<div class="cmds">${cmds}</div>` : ''}
+    <div class="label">What changed</div>
+    <ul class="changes">${changes}</ul>`;
+
+  // Your PC
+  const pc = st.pc, pPc = prev ? prev.pc : null;
+  const folder = pc.folder === 'untracked'
+    ? '<span class="warn">Folder: <b>.env.example</b> is new and not committed</span>'
+    : '<span>Folder: no uncommitted changes</span>';
+  document.getElementById('pc').innerHTML = `
+    <div class="panel-head"><div><h3>Your PC</h3><span class="loc">C:\\JIT_M\\synth\\synth</span></div>${pcStatus(pc, st.gh)}</div>
+    <div class="graph">${graph('pc', pc, pPc)}</div>
+    <div class="meta"><span>You're on branch: <b>${pc.head}</b></span>${folder}</div>
+    ${filesBlock(pc, pPc)}`;
+
+  // GitHub
+  const gh = st.gh, pGh = prev ? prev.gh : null;
+  const items = [];
+  if (gh.issue) items.push(`<div class="item"><span class="t">Issue #3 · Add .env.example template</span><span class="state ${gh.issue}">${gh.issue === 'open' ? 'Open' : 'Closed'}</span></div>`);
+  if (gh.pr) items.push(`<div class="item"><span class="t">PR #4 · add-env-example → main</span><span class="state ${gh.pr}">${gh.pr === 'open' ? 'Open' : 'Merged'}</span></div>`);
+  document.getElementById('gh').innerHTML = `
+    <div class="panel-head"><div><h3>GitHub</h3><span class="loc">github.com/jitmandal001/synth</span></div></div>
+    <div class="graph">${graph('gh', gh, pGh)}</div>
+    ${filesBlock(gh, pGh)}
+    <div><div class="label">Issues and pull requests</div>${items.length ? `<div class="items">${items.join('')}</div>` : '<div class="empty">None yet for this change.</div>'}</div>`;
+
+  // Transfer arrow between the panels
+  const tr = document.getElementById('transfer');
+  const t = st.transfer;
+  tr.className = 'transfer ' + (t || 'idle');
+  tr.innerHTML = t === 'push'
+    ? '<span class="arrow"><span class="h">→</span><span class="v">↓</span></span><span>git push<br>uploads</span>'
+    : t === 'pull'
+      ? '<span class="arrow"><span class="h">←</span><span class="v">↑</span></span><span>git pull<br>downloads</span>'
+      : '<span class="arrow"><span class="h">⇄</span><span class="v">⇅</span></span><span>no transfer<br>this step</span>';
+
+  document.getElementById('prev').disabled = current === 0;
+  document.getElementById('next').disabled = current === STEPS.length - 1;
+}
+
+function go(i) {
+  current = Math.max(0, Math.min(STEPS.length - 1, i));
+  render();
+}
+
+// Build the rail
+const rail = document.getElementById('rail');
+STEPS.forEach((st, i) => {
+  const li = document.createElement('li');
+  li.innerHTML = `<button type="button" class="${st.status}"><span class="num">${st.n}</span><span><span class="name">${esc(st.name)}</span>${st.where ? `<span class="where">${st.where}</span>` : ''}</span></button>`;
+  li.querySelector('button').addEventListener('click', () => go(i));
+  rail.appendChild(li);
+  if (i === LAST_DONE) {
+    const here = document.createElement('li');
+    here.className = 'here';
+    here.textContent = 'You are here';
+    rail.appendChild(here);
+  }
+});
+
+document.getElementById('prev').addEventListener('click', () => go(current - 1));
+document.getElementById('next').addEventListener('click', () => go(current + 1));
+document.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight') go(current + 1);
+  if (e.key === 'ArrowLeft') go(current - 1);
+});
+document.getElementById('card').addEventListener('click', e => {
+  const btn = e.target.closest('.copy');
+  if (!btn) return;
+  const code = btn.previousElementSibling;
+  const done = label => { btn.textContent = label; setTimeout(() => { btn.textContent = 'Copy'; }, 1500); };
+  try {
+    navigator.clipboard.writeText(btn.dataset.cmd).then(() => done('Copied'), () => { selectText(code); done('Selected'); });
+  } catch (err) {
+    selectText(code); done('Selected');
+  }
+});
+function selectText(el) {
+  const r = document.createRange();
+  r.selectNodeContents(el);
+  const s = window.getSelection();
+  s.removeAllRanges();
+  s.addRange(r);
+}
+
+render();
+</script>
+
+</html>
