@@ -20,8 +20,8 @@ Synth is a research intelligence backend that uses an LLM to extract structured 
 
 Synth does not store anything yet: every paper and extraction is discarded once the response is sent. Level 1 adds a database so they survive restarts and later levels can build on them.
 
-- [ ] Install PostgreSQL and create the `synth` database
-- [ ] Async database connection with SQLAlchemy 2.0
+- [x] Install PostgreSQL and create the `synth` database
+- [x] Async database connection with SQLAlchemy 2.0 (`db.py`)
 - [ ] Tables: `users` (stub), `sources`, `documents`, `extractions`
 - [ ] Alembic migrations
 - [ ] Store arXiv metadata (title, category, authors) with each document
@@ -42,12 +42,16 @@ Authentication, automated tests, and production deployment are planned for later
 - **OpenAI Python SDK** — OpenRouter-compatible API client
 - **arXiv API** — research paper metadata and abstract retrieval
 - **Uvicorn** — ASGI development server
+- **PostgreSQL 18** — database server
+- **SQLAlchemy 2.1 (async) + asyncpg** — database access from Python
+- **Alembic** — database migrations (installed; the first migration comes next)
 
 ## Project Structure
 
 ```text
 synth/
 ├── main.py
+├── db.py
 ├── requirements.txt
 ├── .env.example
 ├── .gitignore
@@ -62,6 +66,7 @@ synth/
 ### File Responsibilities
 
 - `main.py` — defines the FastAPI application, endpoints, and request validation.
+- `db.py` — creates the async connection pool to PostgreSQL (`engine`), the session factory, the `Base` class that table models inherit from, and the `get_db()` dependency that gives each request its own database session.
 - `services/arxiv.py` — fetches and parses abstracts from arXiv.
 - `services/extraction.py` — calls OpenRouter and validates the generated summary and key entities.
 - `requirements.txt` — records Python dependencies.
@@ -103,9 +108,34 @@ python -m pip install -r requirements.txt
 
 `requirements.txt` lists only the packages Synth imports directly. When adding a dependency, add its pinned line by hand instead of running `pip freeze`, which records platform-specific packages (such as `uvloop`, which does not install on Windows).
 
-### 3. Configure OpenRouter
+### 3. Set up PostgreSQL
 
-Create an API key through [OpenRouter](https://openrouter.ai/keys).
+Install PostgreSQL 18 from the [official download page](https://www.postgresql.org/download/windows/) (on macOS, use Postgres.app or Homebrew). During installation, set a password for the `postgres` admin user and keep the default port `5432`. Stack Builder is not needed.
+
+Create a dedicated user and database for Synth, so the app never connects as the admin. Open psql as the admin:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U postgres
+```
+
+At the `postgres=#` prompt, run:
+
+```text
+CREATE USER synth;
+\password synth
+CREATE DATABASE synth OWNER synth;
+\q
+```
+
+Use only letters and numbers in the `synth` password, because it becomes part of a connection URL.
+
+Check that the new user can log in:
+
+```powershell
+& "C:\Program Files\PostgreSQL\18\bin\psql.exe" -U synth -d synth -h localhost -c "select current_user, current_database();"
+```
+
+### 4. Configure environment variables
 
 Copy the template to create your own `.env` file:
 
@@ -115,13 +145,20 @@ Copy-Item .env.example .env
 
 On macOS or Linux, use `cp .env.example .env`.
 
-Open `.env` and replace the placeholder value of `OPENROUTER_API_KEY` with your key.
+Open `.env` and fill in both values:
 
-`.env` is gitignored. Keep your key private. Do not hardcode it in Python files, put it in `.env.example`, or commit it to GitHub.
+- `OPENROUTER_API_KEY` — your key from [OpenRouter](https://openrouter.ai/keys).
+- `DATABASE_URL` — replace `YOUR_SYNTH_PASSWORD` with the `synth` password from step 3:
+
+  ```text
+  DATABASE_URL=postgresql+asyncpg://synth:YOUR_SYNTH_PASSWORD@localhost:5432/synth
+  ```
+
+`.env` is gitignored. Keep your key and password private. Do not hardcode them in Python files, put them in `.env.example`, or commit them to GitHub.
 
 The application currently uses OpenRouter's `openrouter/free` model router. Eligible free models may be subject to availability and rate limits.
 
-### 4. Run the application
+### 5. Run the application
 
 From the project root:
 
@@ -223,8 +260,7 @@ The API validates incoming requests and may return errors when:
 
 ## Current Limitations
 
-- Extracted results are not persisted.
-- No database is configured.
+- Extracted results are not persisted yet. The PostgreSQL connection is configured (`db.py`), but no tables exist and no endpoint uses the database.
 - No authentication or authorization is implemented.
 - LLM output quality has not yet been systematically evaluated.
 - Free hosted model availability and latency can vary.
@@ -241,6 +277,25 @@ The API validates incoming requests and may return errors when:
 | 4 | Automated testing, logging, and CI | Planned |
 | 5 | Docker and containerized deployment | Planned |
 | 6+ | Background jobs, ETL, ML workflows, RAG, and production deployment | Planned |
+
+## Development Log
+
+### 2026-10-30 — Level 1 started: database connection
+
+- Installed PostgreSQL 18 locally. It runs as the Windows service `postgresql-x64-18` on port `5432`.
+- Created a dedicated `synth` login and a `synth` database owned by it, so the app never uses the `postgres` admin account.
+- Created the `level-1-postgres` branch for all Level 1 work (issue [#7](https://github.com/jitmandal001/synth/issues/7), milestone *Level 01 — PostgreSQL*).
+- Added SQLAlchemy 2.1 (async), asyncpg, and Alembic to `requirements.txt`, and `DATABASE_URL` to `.env.example`.
+- Added `db.py` with the async engine, session factory, `Base` class, and `get_db()` dependency, and confirmed it connects to PostgreSQL as `synth`.
+- Next: describe the tables in `models.py` and create them with the first Alembic migration.
+
+### 2026-10-29 — Level 0 completed
+
+- Fixed empty LLM responses (larger token budget, low reasoning effort, and up to three attempts) and made malformed arXiv IDs return `400` instead of `502`.
+- Trimmed `requirements.txt` to direct dependencies so it installs on Windows.
+- Closed Level 0 through issue [#1](https://github.com/jitmandal001/synth/issues/1) and pull request [#2](https://github.com/jitmandal001/synth/pull/2), and tagged `v0.0-baseline`.
+- Added `.env.example` (issue [#3](https://github.com/jitmandal001/synth/issues/3), pull request [#4](https://github.com/jitmandal001/synth/pull/4)) and `first-merge.html`, a walkthrough of the Git workflow (pull request [#5](https://github.com/jitmandal001/synth/pull/5)).
+- Started Level 1: opened issue #7 and the *Level 01 — PostgreSQL* milestone.
 
 ## Development Workflow
 
@@ -289,4 +344,4 @@ Before opening a pull request, run the app and test the relevant endpoints throu
 
 ---
 
-**Synth is being developed incrementally.** Level 0 is complete (`v0.0-baseline`); Level 1, persistent storage with PostgreSQL, is in progress.
+**Synth is being developed incrementally.** Level 0 is complete (`v0.0-baseline`); Level 1, persistent storage with PostgreSQL, is in progress: the database connection is in place, and the tables come next.
