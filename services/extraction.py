@@ -1,13 +1,12 @@
 
 import json
 import os
+import time
 
 from fastapi import HTTPException
 from openai import OpenAI
 from pydantic import BaseModel
 
-# openrouter/free sends each call to a randomly chosen free model, and
-# some of them reply with empty or non-JSON output, so those are retried.
 MAX_ATTEMPTS = 3
 
 
@@ -16,7 +15,7 @@ class ResearchExtraction(BaseModel):
     key_entities: list[str]
 
 
-def extract_research(abstract: str) -> ResearchExtraction:
+def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, float]:
     api_key = os.getenv("OPENROUTER_API_KEY")
 
     if not api_key:
@@ -34,6 +33,8 @@ def extract_research(abstract: str) -> ResearchExtraction:
         )
 
         for attempt in range(1, MAX_ATTEMPTS + 1):
+            start_time = time.perf_counter()
+
             response = client.chat.completions.create(
                 model="openrouter/free",
                 messages=[
@@ -47,32 +48,33 @@ def extract_research(abstract: str) -> ResearchExtraction:
                             "by the abstract."
                         ),
                     },
-                    {
-                        "role": "user",
-                        "content": abstract,
-                    },
+                    {"role": "user", "content": abstract},
                 ],
                 response_format={"type": "json_object"},
-                # Reasoning models spend tokens thinking before they
-                # answer, so the budget must leave room for both.
                 max_tokens=4000,
                 temperature=0.2,
                 extra_body={"reasoning": {"effort": "low"}},
             )
 
+            latency = time.perf_counter() - start_time
             choice = response.choices[0]
 
-            # JSONDecodeError and pydantic's ValidationError are both
-            # ValueErrors, so this catches every kind of unusable output.
             try:
                 if not choice.message.content:
                     raise ValueError(
-                        "Empty model response "
+                        f"Empty model response "
                         f"(finish_reason={choice.finish_reason})"
                     )
 
                 data = json.loads(choice.message.content)
-                return ResearchExtraction.model_validate(data)
+                result = ResearchExtraction.model_validate(data)
+
+                usage = response.usage
+                token_count = (
+                    usage.total_tokens if usage is not None else None
+                )
+
+                return result, token_count, latency
 
             except ValueError as exc:
                 print(
@@ -81,7 +83,9 @@ def extract_research(abstract: str) -> ResearchExtraction:
                     flush=True,
                 )
 
-        raise ValueError(f"No usable output after {MAX_ATTEMPTS} attempts")
+        raise ValueError(
+            f"No usable output after {MAX_ATTEMPTS} attempts"
+        )
 
     except HTTPException:
         raise
@@ -92,8 +96,6 @@ def extract_research(abstract: str) -> ResearchExtraction:
         )
         raise HTTPException(
             status_code=502,
-            detail=(
-                "OpenRouter extraction failed. "
-                "Check the server terminal for details."
-            ),
+            detail="OpenRouter extraction failed. "
+                   "Check the server terminal for details.",
         ) from exc
