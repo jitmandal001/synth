@@ -106,5 +106,5 @@ class Extraction(Base):
             item.value for item in enum_class
         ],
     ),
-    nullable=True,
+    nullable=False,
     )
