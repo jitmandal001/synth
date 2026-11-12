@@ -26,7 +26,12 @@ Synth is a research intelligence backend that uses Large Language Models (LLMs) 
 - [x] Persistence verification across application restarts.
 - [x] Fresh database migration, downgrade, and re-upgrade verification.
 
-**Note:** The database schema includes document title and category fields. Automatic arXiv metadata population is a future improvement.
+**Level 1 fixes:**
+
+- [x] arXiv title and primary category are saved, so `/documents?category=` returns results.
+- [x] Duplicate arXiv ingestion prevented: unique constraint on `sources (source_type, source_identifier)`, and `/extract` returns the stored extraction for an already-ingested ID.
+- [x] Blocking arXiv and LLM calls run in a worker thread (`asyncio.to_thread`) so the event loop stays responsive.
+- [x] Release: `v0.1-postgres`.
 
 ## Technology Stack
 
@@ -47,6 +52,10 @@ synth/
 │   ├── __init__.py
 │   ├── arxiv.py
 │   └── extraction.py
+├── scripts/
+│   └── check_db.py
+├── docs/
+│   └── roadmap.html
 ├── requirements.txt
 ├── .env.example
 └── README.md
@@ -151,7 +160,9 @@ A successful extraction is stored across three related tables:
 
 Development follows an issue → branch → commit → pull request workflow.
 
-Level 1 implementation is maintained on the `level-1-postgres` branch.
+Level 1 is merged into `main` and tagged `v0.1-postgres`.
+
+Check the database connection with `python scripts/check_db.py`. The full roadmap is in [docs/roadmap.html](docs/roadmap.html).
 
 The next development phase focuses on modular FastAPI architecture, separating routers, services, schemas, database access, and configuration.
 

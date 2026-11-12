@@ -4,10 +4,21 @@ from urllib.parse import urlencode
 from urllib.error import HTTPError
 from xml.etree import ElementTree as ET
 
+from dataclasses import dataclass
+
 from fastapi import HTTPException
 
 
-def fetch_arxiv_abstract(arxiv_id: str) -> str:
+# Level 1 fix: title/category were never saved, so /documents?category= always
+# returned []. arXiv already sends them, so return them with the abstract.
+@dataclass
+class ArxivPaper:
+    abstract: str
+    title: str | None
+    category: str | None
+
+
+def fetch_arxiv_paper(arxiv_id: str) -> ArxivPaper:
     params = urlencode({
         "id_list": arxiv_id,
         "max_results": 1,
@@ -19,7 +30,11 @@ def fetch_arxiv_abstract(arxiv_id: str) -> str:
             xml_data = response.read()
 
         root = ET.fromstring(xml_data)
-        ns = {"atom": "http://www.w3.org/2005/Atom"}
+        ns = {
+            "atom": "http://www.w3.org/2005/Atom",
+            # Level 1 fix: needed to read <arxiv:primary_category>.
+            "arxiv": "http://arxiv.org/schemas/atom",
+        }
         entry = root.find("atom:entry", ns)
 
         if entry is None:
@@ -41,7 +56,21 @@ def fetch_arxiv_abstract(arxiv_id: str) -> str:
                 detail="The paper has no abstract available.",
             )
 
-        return abstract
+        # Level 1 fix: read title (collapse arXiv's line breaks) and category.
+        # Category is an attribute: <arxiv:primary_category term="cs.CL"/>
+        title = " ".join(
+            entry.findtext("atom:title", default="", namespaces=ns).split()
+        )
+        category_el = entry.find("arxiv:primary_category", ns)
+        category = (
+            category_el.get("term") if category_el is not None else None
+        )
+
+        return ArxivPaper(
+            abstract=abstract,
+            title=title or None,
+            category=category,
+        )
 
     except HTTPException:
         raise
