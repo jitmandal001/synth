@@ -2,13 +2,12 @@ import asyncio
 import json
 from uuid import uuid4
 
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db  # Level 2: was "from db import get_db"
-from models import Source, Document, Extraction, ReviewStatus
+# Level 2: all database queries live in the repository; this file has no SQL.
+from repositories import DocumentRepository
 # Level 2: request/response shapes now live in schemas/ instead of this file.
 from schemas import DocumentResponse, ResearchExtraction, ResearchRequest
 
@@ -28,17 +27,7 @@ async def get_documents(
     category: str | None = None,
     db: AsyncSession = Depends(get_db),
 ):
-    query = (
-        select(Document)
-        .options(selectinload(Document.extractions))
-        .order_by(Document.id.desc())
-    )
-
-    if category:
-        query = query.where(Document.category == category)
-
-    result = await db.execute(query)
-    documents = result.scalars().all()
+    documents = await DocumentRepository(db).list_documents(category)
 
     # Level 2: from_attributes in DocumentResponse replaces format_document().
     return [DocumentResponse.model_validate(document) for document in documents]
@@ -49,14 +38,7 @@ async def get_document(
     document_id: int,
     db: AsyncSession = Depends(get_db),
 ):
-    query = (
-        select(Document)
-        .options(selectinload(Document.extractions))
-        .where(Document.id == document_id)
-    )
-
-    result = await db.execute(query)
-    document = result.scalar_one_or_none()
+    document = await DocumentRepository(db).get_document(document_id)
 
     if document is None:
         raise HTTPException(
@@ -81,6 +63,8 @@ async def extract_endpoint(
     request: ResearchRequest,
     db: AsyncSession = Depends(get_db),
     ):
+    repo = DocumentRepository(db)  # Level 2: every DB call below goes through this
+
     # Exactly one input must be provided.
     if (request.abstract is None) == (request.arxiv_id is None):
         raise HTTPException(
@@ -99,18 +83,7 @@ async def extract_endpoint(
     else:
         # Level 1 fix: the same arXiv ID was being re-fetched, re-sent to the
         # LLM and saved again. Look it up first and return the stored result.
-        existing = await db.execute(
-            select(Extraction)
-            .join(Document)                 # extraction -> its document
-            .join(Source)                   # document -> its source (has the arXiv ID)
-            .where(
-                Source.source_type == "arxiv",
-                Source.source_identifier == request.arxiv_id,
-            )
-            .order_by(Extraction.id.desc())  # newest extraction first
-            .limit(1)
-        )
-        previous = existing.scalar_one_or_none()
+        previous = await repo.find_latest_extraction("arxiv", request.arxiv_id)
 
         if previous is not None:
             # Already ingested: skip arXiv, the LLM and the inserts.
@@ -131,47 +104,19 @@ async def extract_endpoint(
     # Step 2: Generate the LLM extraction.
     result, token_count, latency = await asyncio.to_thread(run_extraction, abstract)
 
-    try:
-        # Step 3: Create the source record.
-        source = Source(
-            source_type=source_type,
-            source_identifier=source_identifier,
-            user_id=None,
-        )
+    # Step 3: Save source, document and extraction in one transaction.
+    # Level 2: the add/flush/commit/rollback code moved into the repository.
+    await repo.save_extraction(
+        source_type=source_type,
+        source_identifier=source_identifier,
+        abstract=abstract,
+        title=title,
+        category=category,
+        summary=result.summary,
+        key_entities=result.key_entities,
+        token_count=token_count,
+        latency=latency,
+    )
 
-        db.add(source)
-        await db.flush()
-
-        # Step 4: Create the document record.
-        document = Document(
-            source_id=source.id,
-            abstract=abstract,
-            # Level 1 fix: save metadata so /documents?category= works.
-            title=title,
-            category=category,
-        )
-
-        db.add(document)
-        await db.flush()
-
-        # Step 5: Create the extraction record.
-        extraction = Extraction(
-            document_id=document.id,
-            summary=result.summary,
-            key_entities=json.dumps(result.key_entities),
-            token_count=token_count,
-            latency=latency,
-            review_status=ReviewStatus.PENDING,
-        )
-
-        db.add(extraction)
-
-        # Step 6: Save all three records.
-        await db.commit()
-
-    except Exception:
-        await db.rollback()
-        raise
-
-    # Step 7: Return the original API response.
+    # Step 4: Return the original API response.
     return result
