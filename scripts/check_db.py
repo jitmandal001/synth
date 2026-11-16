@@ -11,7 +11,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from sqlalchemy import text
-from db import engine
+from core.database import engine  # Level 2: was "from db import engine"
 
 async def main():
     try:

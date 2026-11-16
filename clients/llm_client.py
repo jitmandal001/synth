@@ -1,33 +1,32 @@
-
+# Level 2: moved from services/extraction.py. Talks to the OpenRouter LLM only;
+# raises core.exceptions errors instead of fastapi.HTTPException.
 import json
-import os
 import time
 
-from fastapi import HTTPException
 from openai import OpenAI
-from pydantic import BaseModel
+
+from core.config import get_settings
+from core.exceptions import LLMExtractionError, LLMNotConfiguredError
+# Level 2: the LLM output shape moved to schemas/ with the other API schemas.
+from schemas.extraction import ResearchExtraction
 
 MAX_ATTEMPTS = 3
 
 
-class ResearchExtraction(BaseModel):
-    summary: str
-    key_entities: list[str]
-
-
 def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, float]:
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    # Level 2: key, base URL and model come from Settings, not os.getenv/hardcoded.
+    settings = get_settings()
 
-    if not api_key:
-        raise HTTPException(
-            status_code=500,
-            detail="OPENROUTER_API_KEY is not configured.",
-        )
+    # Missing OR empty (OPENROUTER_API_KEY=) both count as "not configured",
+    # matching Level 1's `if not api_key` check.
+    key = settings.openrouter_api_key
+    if key is None or not key.get_secret_value():
+        raise LLMNotConfiguredError("OPENROUTER_API_KEY is not configured.")
 
     try:
         client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
+            base_url=settings.openrouter_base_url,
+            api_key=key.get_secret_value(),
             timeout=60.0,
             max_retries=3,
         )
@@ -36,7 +35,7 @@ def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, flo
             start_time = time.perf_counter()
 
             response = client.chat.completions.create(
-                model="openrouter/free",
+                model=settings.llm_model,
                 messages=[
                     {
                         "role": "system",
@@ -87,15 +86,13 @@ def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, flo
             f"No usable output after {MAX_ATTEMPTS} attempts"
         )
 
-    except HTTPException:
-        raise
     except Exception as exc:
+        # The real cause goes to the server terminal; the user gets a safe message.
         print(
             f"OpenRouter error: {type(exc).__name__}: {exc}",
             flush=True,
         )
-        raise HTTPException(
-            status_code=502,
-            detail="OpenRouter extraction failed. "
-                   "Check the server terminal for details.",
+        raise LLMExtractionError(
+            "OpenRouter extraction failed. "
+            "Check the server terminal for details."
         ) from exc
