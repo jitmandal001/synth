@@ -8,6 +8,8 @@ from dataclasses import dataclass
 
 from fastapi import HTTPException
 
+from core.config import get_settings
+
 
 # Level 1 fix: title/category were never saved, so /documents?category= always
 # returned []. arXiv already sends them, so return them with the abstract.
@@ -23,7 +25,8 @@ def fetch_arxiv_paper(arxiv_id: str) -> ArxivPaper:
         "id_list": arxiv_id,
         "max_results": 1,
     })
-    url = f"https://export.arxiv.org/api/query?{params}"
+    # Level 2: base URL comes from Settings instead of being hardcoded.
+    url = f"{get_settings().arxiv_api_base_url}?{params}"
 
     try:
         with urlopen(url, timeout=15) as response:

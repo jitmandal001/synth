@@ -1,8 +1,6 @@
-import os
 from collections.abc import AsyncGenerator
 # SQLAlchemy -> Connects Python code to the database so you can query, write, and map tables to Python classes.
 # alembic -> Handles database migrations, allowing you to version control your database schema changes.
-from dotenv import load_dotenv
 from sqlalchemy.ext.asyncio import (
     AsyncSession,
     async_sessionmaker,
@@ -10,17 +8,15 @@ from sqlalchemy.ext.asyncio import (
 )
 from sqlalchemy.orm import DeclarativeBase
 
-# Load environment variables from .env
-load_dotenv()
+from core.config import get_settings
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not configured.")
+# Level 2: the URL comes from Settings, which already fails at startup if it's
+# missing, so the old load_dotenv/os.getenv/RuntimeError check isn't needed.
+settings = get_settings()
 
 # Create the asynchronous database engine 	Creates the connection engine to PostgreSQL.
 engine = create_async_engine(
-    DATABASE_URL,
+    settings.database_url.get_secret_value(),
     pool_pre_ping=True,
     echo=False,
 )

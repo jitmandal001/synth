@@ -1,0 +1,444 @@
+<title>Synth Branch Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a git "subway map" — one horizontal lane per branch, time flows left→right; detail + next-step panels below. */
+:root {
+  --bg: #f4f6f9;
+  --surface: #ffffff;
+  --ink: #17202c;
+  --muted: #5a6677;
+  --line: #dde2ea;
+  --soft: #eef1f6;
+  --c-main: #1f4fa8;
+  --c-l0: #0d8277;
+  --c-env: #a8710e;
+  --c-l1: #7748c0;
+  --c-fix: #cf4f1a;
+  --c-l2: #2b8537;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #10141a; --surface: #171c24; --ink: #e6ebf2; --muted: #9aa5b4; --line: #2a323e; --soft: #1e2530;
+    --c-main: #7ea4ff; --c-l0: #4cc6b8; --c-env: #e2b452; --c-l1: #b596f2; --c-fix: #ff8b58; --c-l2: #72d17d;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #10141a; --surface: #171c24; --ink: #e6ebf2; --muted: #9aa5b4; --line: #2a323e; --soft: #1e2530;
+  --c-main: #7ea4ff; --c-l0: #4cc6b8; --c-env: #e2b452; --c-l1: #b596f2; --c-fix: #ff8b58; --c-l2: #72d17d;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+body {
+  background: var(--bg); color: var(--ink);
+  font-family: var(--font-body); font-size: 15px; line-height: 1.55;
+}
+.wrap {
+  max-width: 1180px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 32px 56px;
+  display: flex; flex-direction: column; gap: 22px;
+}
+header { display: flex; flex-direction: column; gap: 6px; }
+.eyebrow { font-family: var(--font-mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0; text-wrap: balance; letter-spacing: -.01em; }
+h2 { font-family: var(--font-display); font-size: 18px; margin: 0; }
+.lede { margin: 0; color: var(--muted); max-width: 68ch; }
+code, .mono { font-family: var(--font-mono); font-size: .9em; }
+
+/* stage switcher */
+.stages { display: flex; flex-wrap: wrap; gap: 8px; }
+.stage-btn {
+  font: 500 14px var(--font-body); color: var(--ink);
+  background: var(--surface); border: 1px solid var(--line); border-radius: 999px;
+  padding: 8px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px;
+}
+.stage-btn .n { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.stage-btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.stage-btn[aria-pressed="true"] .n { color: var(--bg); opacity: .7; }
+.stage-btn:focus-visible, .node:focus-visible, .copy:focus-visible { outline: 2px solid var(--c-fix); outline-offset: 3px; }
+
+/* graph */
+.graph-card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.graph-head { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; flex-wrap: wrap; padding: 14px 18px; border-bottom: 1px solid var(--line); }
+.graph-head p { margin: 0; color: var(--muted); font-size: 13px; }
+.scroller { overflow-x: auto; }
+svg { display: block; }
+.node { cursor: pointer; }
+.hash { font-family: var(--font-mono); font-size: 10.5px; fill: var(--muted); }
+.pill-text { font-family: var(--font-mono); font-size: 11.5px; font-weight: 600; }
+.tag-text { font-family: var(--font-mono); font-size: 10.5px; font-weight: 500; fill: var(--ink); }
+.timeaxis { font-family: var(--font-mono); font-size: 10.5px; fill: var(--muted); }
+@keyframes pulse { 0% { r: 11; opacity: .55; } 100% { r: 22; opacity: 0; } }
+.halo { animation: pulse 1.8s ease-out infinite; }
+@media (prefers-reduced-motion: reduce) { .halo { animation: none; opacity: .25; } }
+
+/* panels */
+.panels { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 760px) { .panels { grid-template-columns: minmax(0, 1fr); } }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.panel p { margin: 0; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; font-size: 14px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 600 12px var(--font-mono); padding: 2px 9px; border-radius: 999px; border: 1.5px solid currentColor; white-space: nowrap; }
+.chip .dot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.cmd { position: relative; background: var(--soft); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; overflow-x: auto; }
+.cmd pre { margin: 0; font: 13px/1.6 var(--font-mono); white-space: pre; }
+.cmd .c { color: var(--muted); }
+.copy { position: absolute; top: 8px; right: 8px; font: 500 12px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 7px; padding: 3px 9px; cursor: pointer; }
+.note { font-size: 13.5px; color: var(--muted); border-left: 3px solid var(--c-env); padding: 2px 0 2px 12px; }
+
+/* files that arrive in main */
+.filelist { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+.f { display: grid; grid-template-columns: 76px minmax(0, 15rem) minmax(0, 1fr); gap: 12px; align-items: baseline; padding: 9px 12px; font-size: 13.5px; border-top: 1px solid var(--line); }
+.f:first-child { border-top: 0; }
+.f > code { font-weight: 600; overflow-wrap: anywhere; }
+.f > span:last-child { color: var(--muted); min-width: 0; }
+@media (max-width: 640px) { .f { grid-template-columns: 76px minmax(0, 1fr); } .f > span:last-child { grid-column: 2; } }
+.tag { font: 600 11px var(--font-mono); text-align: center; padding: 1px 0; border-radius: 5px; border: 1.5px solid currentColor; }
+.tag.mod { color: var(--c-main); }
+.tag.add { color: var(--c-l2); }
+.tag.mv { color: var(--c-l1); }
+
+/* branch list */
+.branches { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 900px) { .branches { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .branches { grid-template-columns: minmax(0, 1fr); } }
+.branch { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 14px; display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.branch .top { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.branch .name { font: 600 13.5px var(--font-mono); overflow-wrap: anywhere; display: flex; align-items: center; gap: 8px; }
+.branch .swatch { width: 12px; height: 12px; border-radius: 50%; flex: none; }
+.branch p { margin: 0; font-size: 13.5px; color: var(--muted); }
+.status { font: 500 11.5px var(--font-mono); padding: 1px 8px; border-radius: 6px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.status.here { background: var(--ink); color: var(--bg); }
+.status.wait { color: var(--c-env); background: var(--soft); }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">synth · git history</div>
+    <h1>Synth Branch Map</h1>
+    <p class="lede">Every dot is a commit; each row is a branch. Time runs left to right. Click any dot to see what it is. The three steps replay how the Level 1 fixes travelled: from their own branch, into main, then into Level 2.</p>
+  </header>
+
+  <div class="stages" role="group" aria-label="Which moment to show">
+    <button class="stage-btn" id="stage-0" data-stage="0" aria-pressed="false"><span class="n">1</span>Before the PR</button>
+    <button class="stage-btn" id="stage-1" data-stage="1" aria-pressed="false"><span class="n">2</span>After PR #10</button>
+    <button class="stage-btn" id="stage-2" data-stage="2" aria-pressed="false"><span class="n">3</span>Now: Level 2 updated</button>
+  </div>
+
+  <section class="graph-card" aria-label="Branch graph">
+    <div class="graph-head">
+      <h2 id="graph-title">Where things stand now</h2>
+      <p>Ringed dot = merge commit · dashed = only on your Mac (not pushed) · pulsing = HEAD (where you are)</p>
+    </div>
+    <div class="scroller" id="scroller"><svg id="graph" role="img" aria-label="Commit graph of the synth repository"></svg></div>
+  </section>
+
+  <div class="panels">
+    <section class="panel" aria-live="polite">
+      <div class="eyebrow">Selected commit</div>
+      <h2 id="d-title"></h2>
+      <dl class="kv">
+        <dt>Hash</dt><dd class="mono" id="d-hash"></dd>
+        <dt>Branch</dt><dd id="d-branch"></dd>
+        <dt>Parents</dt><dd class="mono" id="d-parents"></dd>
+        <dt>Tags</dt><dd class="mono" id="d-tags"></dd>
+      </dl>
+      <p id="d-note"></p>
+    </section>
+
+    <section class="panel">
+      <div class="eyebrow" id="s-eyebrow">Next step</div>
+      <h2 id="s-title"></h2>
+      <p id="s-text"></p>
+      <div class="cmd"><button class="copy" id="copy-btn" type="button">Copy</button><pre id="s-cmd"></pre></div>
+      <p class="note" id="s-note"></p>
+    </section>
+  </div>
+
+  <section class="panel" id="files" hidden>
+    <div class="eyebrow">What the fixes commit daa5f51 brought · 7 files · +528 −11</div>
+    <h2>Files the fixes changed</h2>
+    <div class="filelist">
+      <div class="f"><span class="tag mod">modified</span><code>main.py</code><span>Duplicate lookup before arXiv/LLM; <code>asyncio.to_thread</code> for blocking calls</span></div>
+      <div class="f"><span class="tag mod">modified</span><code>services/arxiv.py</code><span>Returns title and primary category with the abstract</span></div>
+      <div class="f"><span class="tag mod">modified</span><code>models.py</code><span>Unique <code>(source_type, source_identifier)</code>; <code>review_status</code> type fixed</span></div>
+      <div class="f"><span class="tag add">new</span><code>alembic/versions/fa3786d6e67b_…py</code><span>Migration that adds the unique constraint</span></div>
+      <div class="f"><span class="tag mv">moved</span><code>test.py → scripts/check_db.py</code><span>Connection check, out of pytest's way</span></div>
+      <div class="f"><span class="tag add">new</span><code>docs/roadmap.html</code><span>The 14-level roadmap</span></div>
+      <div class="f"><span class="tag mod">modified</span><code>README.md</code><span>Level 1 fixes section, structure, branch info</span></div>
+    </div>
+    <p class="note">Both merges were clean, with no conflicts. Merging never changes the database; yours was already migrated. Another machine needs <code>alembic upgrade head</code> after pulling.</p>
+  </section>
+
+  <section style="display:flex;flex-direction:column;gap:12px">
+    <h2>The branches</h2>
+    <div class="branches" id="branches"></div>
+  </section>
+</div>
+
+<script>
+(function () {
+  const LANES = {
+    l0:   { y: 46,  name: "level-0-baseline",     color: "--c-l0" },
+    env:  { y: 104, name: "add-env-example",      color: "--c-env" },
+    main: { y: 176, name: "main",                 color: "--c-main" },
+    l1:   { y: 246, name: "level-1-postgres",     color: "--c-l1" },
+    fix:  { y: 306, name: "level-1-fixes",        color: "--c-fix" },
+    l2:   { y: 366, name: "level-2-architecture", color: "--c-l2" },
+  };
+  const STEP = 54, X0 = 40, H = 410;
+  const xOf = i => X0 + i * STEP;
+
+  const C = [
+    { h: "0855029", lane: "main", i: 0,  p: [], m: "Initial commit: create Synth FastAPI backend", note: "Where the whole project starts: a single FastAPI app." },
+    { h: "95b3664", lane: "main", i: 1,  p: ["0855029"], m: "added requirement.txt" },
+    { h: "b3c93c4", lane: "main", i: 2,  p: ["95b3664"], m: "Document synth level 0 baseline", note: "level-0-baseline branches off here." },
+    { h: "6fada38", lane: "l0",   i: 3,  p: ["b3c93c4"], m: "Pin only direct dependencies in requirements.txt" },
+    { h: "22c10b4", lane: "l0",   i: 4,  p: ["6fada38"], m: "Return 400 for malformed arXiv IDs" },
+    { h: "c079db6", lane: "l0",   i: 5,  p: ["22c10b4"], m: "Fix empty LLM responses from reasoning models" },
+    { h: "a231536", lane: "l0",   i: 6,  p: ["c079db6"], m: "Document Level 0 setup and mark it complete" },
+    { h: "cadf764", lane: "main", i: 7,  p: ["b3c93c4", "a231536"], tags: ["v0.0-baseline"], m: "Merge Level 0: working baseline extraction (#2)", note: "Level 0 lands in main through PR #2 and is tagged v0.0-baseline." },
+    { h: "12efa97", lane: "env",  i: 8,  p: ["cadf764"], m: "ADD .env.example template" },
+    { h: "095ea33", lane: "main", i: 9,  p: ["cadf764", "12efa97"], m: "Merge pull request #4 from add-env-example", note: "PR #4 brings .env.example into main." },
+    { h: "be8bc0f", lane: "env",  i: 10, p: ["12efa97"], m: "merge visualisation" },
+    { h: "0eaa947", lane: "main", i: 11, p: ["095ea33", "be8bc0f"], m: "Merge pull request #5 from add-env-example", note: "PR #5 brings the second add-env-example commit into main." },
+    { h: "1b48056", lane: "main", i: 12, p: ["0eaa947"], m: "Update README for Level 0 completion and Level 1 start", note: "level-1-postgres branches off here." },
+    { h: "ae0a4e1", lane: "l1",   i: 13, p: ["1b48056"], m: "Add database dependencies and DATABASE_URL setting", note: "First Level 1 commit." },
+    { h: "116aad1", lane: "l1",   i: 14, p: ["ae0a4e1"], m: "Add async database engine and session" },
+    { h: "c724ab6", lane: "l1",   i: 15, p: ["116aad1"], m: "Document PostgreSQL setup and Level 1 progress" },
+    { h: "925473d", lane: "l1",   i: 16, p: ["c724ab6"], m: "Set up async PostgreSQL database infrastructure 2nd time on mac device" },
+    { h: "ec4ee33", lane: "l1",   i: 17, p: ["925473d"], m: "Add SQLAlchemy models and Alembic migrations" },
+    { h: "6ea1965", lane: "l1",   i: 18, p: ["ec4ee33"], m: "Complete Level 1: PostgreSQL persistence and Alembic migrations", note: "Last Level 1 commit before PR #8." },
+    { h: "7f5d240", lane: "main", i: 19, p: ["1b48056", "6ea1965"], tags: ["v0.1-postgres"], m: "Merge pull request #8 from level-1-postgres", note: "Level 1 lands in main. Both level-1-fixes and level-2-architecture branch off this exact commit, so neither knows about the other. The v0.1-postgres tag points here, which is before the fixes." },
+    { h: "daa5f51", lane: "fix",  i: 20, p: ["7f5d240"], m: "Level 1 fixes: arXiv metadata, dedupe sources, non-blocking calls", note: "All the Level 1 fixes in one commit: arXiv title and category, unique sources plus the lookup, asyncio.to_thread, and the cleanups. Pushed to GitHub and tested, but not in main yet." },
+    { h: "3e738ff", lane: "l2",   i: 20, p: ["7f5d240"], m: "Pin only direct dependencies again", note: "Level 2 work: requirements.txt trimmed back to direct dependencies." },
+    { h: "e483eb5", lane: "l2",   i: 21, p: ["3e738ff"], m: "Add smoke test script", note: "Level 2 work: scripts/smoke_test_for_L2.py. This branch does not have the Level 1 fixes yet." },
+    { h: "d72d98d", lane: "main", i: 22, p: ["7f5d240", "daa5f51"], tags: ["v0.1.1-postgres"], stage: 1, m: "Merge pull request #10 from level-1-fixes", note: "Done. PR #10 merged on GitHub, so main now has the Level 1 fixes. Tagged v0.1.1-postgres and pushed, so the fixed Level 1 has its own release." },
+    { h: "3504f75", lane: "l2",   i: 23, p: ["e483eb5", "d72d98d"], stage: 2, local: true, m: "Merge branch 'main' into level-2-architecture", note: "Done on your Mac, not pushed yet. Level 2 now has the fixes and the fa3786d6e67b migration, and kept its own short requirements.txt and smoke test. Checked: alembic finds the migration, the app imports, models match the DB." },
+  ];
+  const byHash = Object.fromEntries(C.map(c => [c.h, c]));
+
+  const STAGES = [
+    {
+      title: "Before the PR: fixes on their own branch",
+      head: "fix",
+      tips: { main: "7f5d240", l2: "e483eb5" },
+      done: true,
+      sTitle: "Push level-1-fixes and open a PR",
+      sText: "The fixes lived only on level-1-fixes. main and level-2-architecture both stopped at 7f5d240, so neither had them.",
+      cmd: "git push -u origin level-1-fixes\n# then on GitHub: New pull request\n#   base: main  <-  compare: level-1-fixes",
+      note: "v0.1-postgres points to 7f5d240, before the fixes. That's why the fixed version got its own tag.",
+    },
+    {
+      title: "After PR #10: main has the fixes",
+      head: "main",
+      tips: { main: "d72d98d", l2: "e483eb5" },
+      done: true,
+      sTitle: "Pull main and tag the fixed release",
+      sText: "PR #10 created merge commit d72d98d on main. You pulled it and tagged it v0.1.1-postgres.",
+      cmd: "git switch main\ngit pull\ngit tag v0.1.1-postgres\ngit push origin v0.1.1-postgres",
+      note: "At this point level-2-architecture still started from the old 7f5d240 and had none of the fixes.",
+    },
+    {
+      title: "Now: Level 2 has the fixes",
+      head: "l2",
+      tips: { main: "d72d98d", l2: "3504f75" },
+      done: false,
+      sTitle: "Push level-2-architecture",
+      sText: "You merged main into Level 2 (3504f75). It has the fixes plus its own two commits, and it works: alembic is at fa3786d6e67b, the app imports, and the models match the DB. GitHub doesn't have this merge yet, because your branch is 3 commits ahead.",
+      cmd: "git push\n\n# optional cleanup\ngit branch -d level-1-fixes\ngit push origin --delete level-1-fixes",
+      note: "After pushing, Level 1 is complete and you can start the Level 2 refactor on top of the fixed code.",
+    },
+  ];
+
+  const BRANCH_INFO = [
+    { lane: "l2", text: "Level 2 in progress: pinned dependencies, smoke test, and now the Level 1 fixes.", status: s => s === 2 ? ["you are here · not pushed", "here"] : ["no fixes yet", "wait"] },
+    { lane: "main", text: "Always deployable. Level 0, Level 1 and the fixes. Tagged v0.1.1-postgres.", status: s => s === 1 ? ["you were here", "here"] : s >= 1 ? ["has the fixes", ""] : ["no fixes yet", "wait"] },
+    { lane: "fix", text: "One commit with all the Level 1 fixes. Merged, so it can be deleted.", status: s => s === 0 ? ["you were here", "here"] : ["merged (#10)", ""] },
+    { lane: "l1", text: "The original Level 1 work. Merged into main through PR #8.", status: () => ["merged (#8)", ""] },
+    { lane: "l0", text: "Level 0 baseline. Merged through PR #2, tagged v0.0-baseline.", status: () => ["merged (#2)", ""] },
+    { lane: "env", text: "Added .env.example. Merged through PRs #4 and #5.", status: () => ["merged (#4, #5)", ""] },
+  ];
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("graph");
+  const W = xOf(23) + 230;
+  svg.setAttribute("viewBox", `0 0 ${W} ${H}`);
+  svg.setAttribute("width", W);
+  svg.setAttribute("height", H);
+
+  let stage = 0;
+  let selected = "daa5f51";
+
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  const col = lane => `var(${LANES[lane].color})`;
+  const visible = c => (c.stage || 0) <= stage;
+  const pos = c => [xOf(c.i), LANES[c.lane].y];
+
+  function render() {
+    svg.textContent = "";
+    const st = STAGES[stage];
+    const vis = C.filter(visible);
+
+    // edges
+    const gE = el("g", { fill: "none" }, svg);
+    vis.forEach(c => c.p.forEach(ph => {
+      const p = byHash[ph]; if (!p || !visible(p)) return;
+      const [x1, y1] = pos(p), [x2, y2] = pos(c);
+      const lane = c.p.length > 1 && ph === c.p[1] ? p.lane : c.lane;
+      const d = y1 === y2 ? `M${x1} ${y1}L${x2} ${y2}` : `M${x1} ${y1}C${(x1 + x2) / 2} ${y1} ${(x1 + x2) / 2} ${y2} ${x2} ${y2}`;
+      const attrs = { d, stroke: col(lane), "stroke-width": 3.5, "stroke-linecap": "round" };
+      if (c.local) attrs["stroke-dasharray"] = "6 6";
+      el("path", attrs, gE);
+    }));
+
+    // tags
+    vis.forEach(c => (c.tags || []).forEach(t => {
+      const [x, y] = pos(c);
+      const w = t.length * 6.6 + 16, ty = y - 40;
+      const g = el("g", {}, svg);
+      el("path", { d: `M${x - w / 2} ${ty - 10}h${w}v20h${-w + 8}l-8 -10z`, fill: "var(--soft)", stroke: "var(--line)", "stroke-width": 1, ...(c.local ? { "stroke-dasharray": "3 3" } : {}) }, g);
+      el("line", { x1: x, y1: ty + 10, x2: x, y2: y - 10, stroke: "var(--line)", "stroke-width": 1.5 }, g);
+      const tx = el("text", { x: x + 4, y: ty + 4, "text-anchor": "middle", class: "tag-text" }, g);
+      tx.textContent = t;
+    }));
+
+    // nodes
+    const headTip = st.head === "fix" ? "daa5f51" : st.tips[st.head];
+    vis.forEach(c => {
+      const [x, y] = pos(c);
+      const g = el("g", { class: "node", tabindex: 0, role: "button", "aria-label": `${c.h}: ${c.m}` }, svg);
+      if (c.h === headTip) el("circle", { cx: x, cy: y, r: 11, fill: col(c.lane), class: "halo" }, g);
+      if (c.h === selected) el("circle", { cx: x, cy: y, r: 13, fill: "none", stroke: "var(--ink)", "stroke-width": 2 }, g);
+      const merge = c.p.length > 1;
+      el("circle", { cx: x, cy: y, r: merge ? 9 : 7.5, fill: "var(--surface)", stroke: col(c.lane), "stroke-width": 3.5, ...(c.local ? { "stroke-dasharray": "4 3" } : {}) }, g);
+      if (merge) el("circle", { cx: x, cy: y, r: 3.5, fill: col(c.lane) }, g);
+      el("circle", { cx: x, cy: y, r: 16, fill: "transparent" }, g);
+      const t = el("text", { x, y: y + 26, "text-anchor": "middle", class: "hash" }, g);
+      t.textContent = c.h;
+      g.addEventListener("click", () => select(c.h));
+      g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(c.h); } });
+    });
+
+    // branch labels at tips
+    const tips = { l0: "a231536", env: "be8bc0f", l1: "6ea1965", fix: "daa5f51", main: st.tips.main, l2: st.tips.l2 };
+    Object.entries(tips).forEach(([lane, h]) => {
+      const c = byHash[h]; const [x, y] = pos(c);
+      let label = LANES[lane].name;
+      if (lane === "fix" && stage > 0) label += " (merged)";
+      const isHead = lane === st.head;
+      if (isHead) label += "  ← HEAD";
+      const w = label.length * 7 + 18, lx = x + 18;
+      const g = el("g", {}, svg);
+      el("rect", { x: lx, y: y - 12, width: w, height: 24, rx: 12, fill: isHead ? col(lane) : "var(--surface)", stroke: col(lane), "stroke-width": 1.5 }, g);
+      const t = el("text", { x: lx + w / 2, y: y + 4, "text-anchor": "middle", class: "pill-text", fill: isHead ? "var(--surface)" : col(lane) }, g);
+      t.textContent = label;
+    });
+
+    // axis hint
+    const ax = el("text", { x: X0 - 12, y: H - 8, class: "timeaxis" }, svg);
+    ax.textContent = "older";
+    const ax2 = el("text", { x: xOf(23), y: H - 8, class: "timeaxis", "text-anchor": "middle" }, svg);
+    ax2.textContent = "newer →";
+
+    document.getElementById("graph-title").textContent = st.title;
+    document.getElementById("s-eyebrow").textContent = `Step ${stage + 1} of 3 · ${st.done ? "done ✓" : "to do"}`;
+    document.getElementById("s-title").textContent = st.sTitle;
+    document.getElementById("s-text").textContent = st.sText;
+    document.getElementById("s-note").textContent = st.note;
+    const pre = document.getElementById("s-cmd");
+    pre.textContent = "";
+    st.cmd.split("\n").forEach((line, i, arr) => {
+      const span = document.createElement("span");
+      if (line.trim().startsWith("#")) span.className = "c";
+      span.textContent = line + (i < arr.length - 1 ? "\n" : "");
+      pre.appendChild(span);
+    });
+    renderBranches();
+    renderDetail();
+  }
+
+  function renderDetail() {
+    const c = byHash[selected];
+    document.getElementById("d-title").textContent = c.m;
+    document.getElementById("d-hash").textContent = c.local ? `${c.h} (only on your Mac, not pushed)` : c.h;
+    const b = document.getElementById("d-branch");
+    b.textContent = "";
+    const chip = document.createElement("span");
+    chip.className = "chip"; chip.style.color = col(c.lane);
+    chip.innerHTML = '<span class="dot"></span>';
+    chip.appendChild(document.createTextNode(LANES[c.lane].name));
+    b.appendChild(chip);
+    document.getElementById("d-parents").textContent = c.p.length ? c.p.join(" + ") + (c.p.length > 1 ? "  (merge)" : "") : "none (first commit)";
+    document.getElementById("d-tags").textContent = (c.tags || []).join(", ") || "—";
+    document.getElementById("d-note").textContent = c.note || `A regular commit on ${LANES[c.lane].name}.`;
+  }
+
+  function renderBranches() {
+    const box = document.getElementById("branches");
+    box.textContent = "";
+    BRANCH_INFO.forEach(b => {
+      const [label, cls] = b.status(stage);
+      const d = document.createElement("div");
+      d.className = "branch";
+      d.innerHTML = `<div class="top"><span class="name"><span class="swatch"></span></span><span class="status"></span></div><p></p>`;
+      d.querySelector(".swatch").style.background = col(b.lane);
+      d.querySelector(".name").appendChild(document.createTextNode(LANES[b.lane].name));
+      const s = d.querySelector(".status"); s.textContent = label; if (cls) s.classList.add(cls);
+      d.querySelector("p").textContent = b.text;
+      box.appendChild(d);
+    });
+  }
+
+  function select(h) { selected = h; render(); }
+
+  const HASHES = ["now", "after-merge", "after-level-2"];
+  function setStage(n, updateHash) {
+    stage = n;
+    document.querySelectorAll(".stage-btn").forEach(b => b.setAttribute("aria-pressed", +b.dataset.stage === n ? "true" : "false"));
+    selected = ["daa5f51", "d72d98d", "3504f75"][n];
+    document.getElementById("files").hidden = n === 0;
+    render();
+    scrollRight();
+    if (updateHash) { try { history.replaceState(null, "", "#" + HASHES[n]); } catch (e) { location.hash = HASHES[n]; } }
+  }
+  document.querySelectorAll(".stage-btn").forEach(btn => btn.addEventListener("click", () => setStage(+btn.dataset.stage, true)));
+  window.addEventListener("hashchange", () => { const i = HASHES.indexOf(location.hash.slice(1)); if (i >= 0) setStage(i, false); });
+
+  const copyBtn = document.getElementById("copy-btn");
+  copyBtn.addEventListener("click", () => {
+    const text = STAGES[stage].cmd;
+    const done = () => { copyBtn.textContent = "Copied"; setTimeout(() => copyBtn.textContent = "Copy", 1400); };
+    try {
+      navigator.clipboard.writeText(text).then(done, () => selectCmd());
+    } catch (e) { selectCmd(); }
+  });
+  function selectCmd() {
+    const r = document.createRange(); r.selectNodeContents(document.getElementById("s-cmd"));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  }
+
+  const scroller = document.getElementById("scroller");
+  function scrollRight() { scroller.scrollLeft = scroller.scrollWidth; }
+
+  const startIdx = HASHES.indexOf(location.hash.slice(1));
+  setStage(startIdx >= 0 ? startIdx : 2, false);
+  requestAnimationFrame(scrollRight);
+})();
+</script>

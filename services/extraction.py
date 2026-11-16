@@ -1,11 +1,12 @@
 
 import json
-import os
 import time
 
 from fastapi import HTTPException
 from openai import OpenAI
 from pydantic import BaseModel
+
+from core.config import get_settings
 
 MAX_ATTEMPTS = 3
 
@@ -16,9 +17,10 @@ class ResearchExtraction(BaseModel):
 
 
 def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, float]:
-    api_key = os.getenv("OPENROUTER_API_KEY")
+    # Level 2: key, base URL and model come from Settings, not os.getenv/hardcoded.
+    settings = get_settings()
 
-    if not api_key:
+    if settings.openrouter_api_key is None:
         raise HTTPException(
             status_code=500,
             detail="OPENROUTER_API_KEY is not configured.",
@@ -26,8 +28,8 @@ def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, flo
 
     try:
         client = OpenAI(
-            base_url="https://openrouter.ai/api/v1",
-            api_key=api_key,
+            base_url=settings.openrouter_base_url,
+            api_key=settings.openrouter_api_key.get_secret_value(),
             timeout=60.0,
             max_retries=3,
         )
@@ -36,7 +38,7 @@ def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, flo
             start_time = time.perf_counter()
 
             response = client.chat.completions.create(
-                model="openrouter/free",
+                model=settings.llm_model,
                 messages=[
                     {
                         "role": "system",

@@ -1,20 +1,16 @@
 
 import asyncio
-import os
 
 from logging.config import fileConfig
 
 from alembic import context
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
-from dotenv import load_dotenv
 
+from core.config import get_settings
 from db import Base
 import models  # Registers all SQLAlchemy models
 
-
-# Load environment variables from .env
-load_dotenv()
 
 config = context.config
 
@@ -22,11 +18,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Read database URL from .env
-database_url = os.getenv("DATABASE_URL")
-
-if not database_url:
-    raise RuntimeError("DATABASE_URL is not configured.")
+# Level 2: same Settings as the app, so migrations always hit the same database.
+database_url = get_settings().database_url.get_secret_value()
 
 # Escape percent signs for ConfigParser interpolation
 config.set_main_option(
