@@ -1,14 +1,17 @@
-
-from urllib.request import urlopen
-from urllib.parse import urlencode
+# Level 2: moved from services/arxiv.py. Talks to the arXiv API only;
+# raises core.exceptions errors instead of fastapi.HTTPException.
+from dataclasses import dataclass
 from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import urlopen
 from xml.etree import ElementTree as ET
 
-from dataclasses import dataclass
-
-from fastapi import HTTPException
-
 from core.config import get_settings
+from core.exceptions import (
+    ArxivPaperNotFoundError,
+    ArxivUnavailableError,
+    InvalidArxivIdError,
+)
 
 
 # Level 1 fix: title/category were never saved, so /documents?category= always
@@ -41,10 +44,7 @@ def fetch_arxiv_paper(arxiv_id: str) -> ArxivPaper:
         entry = root.find("atom:entry", ns)
 
         if entry is None:
-            raise HTTPException(
-                status_code=404,
-                detail="No arXiv paper found for this ID.",
-            )
+            raise ArxivPaperNotFoundError("No arXiv paper found for this ID.")
 
         abstract = entry.findtext(
             "atom:summary",
@@ -54,10 +54,7 @@ def fetch_arxiv_paper(arxiv_id: str) -> ArxivPaper:
         abstract = " ".join(abstract.split())
 
         if not abstract:
-            raise HTTPException(
-                status_code=404,
-                detail="The paper has no abstract available.",
-            )
+            raise ArxivPaperNotFoundError("The paper has no abstract available.")
 
         # Level 1 fix: read title (collapse arXiv's line breaks) and category.
         # Category is an attribute: <arxiv:primary_category term="cs.CL"/>
@@ -75,21 +72,13 @@ def fetch_arxiv_paper(arxiv_id: str) -> ArxivPaper:
             category=category,
         )
 
-    except HTTPException:
-        raise
+    except ArxivPaperNotFoundError:
+        raise  # our own error from above: pass it through unchanged
     except HTTPError as exc:
         # arXiv rejects malformed IDs with a 400.
         if exc.code == 400:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid arXiv ID format.",
-            ) from exc
-        raise HTTPException(
-            status_code=502,
-            detail="Could not fetch the abstract from arXiv.",
-        ) from exc
+            raise InvalidArxivIdError("Invalid arXiv ID format.") from exc
+        raise ArxivUnavailableError("Could not fetch the abstract from arXiv.") from exc
     except Exception as exc:
-        raise HTTPException(
-            status_code=502,
-            detail="Could not fetch the abstract from arXiv.",
-        ) from exc
+        # Network errors, timeouts, broken XML, ...
+        raise ArxivUnavailableError("Could not fetch the abstract from arXiv.") from exc

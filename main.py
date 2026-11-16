@@ -2,7 +2,8 @@ import asyncio
 import json
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Depends
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db  # Level 2: was "from db import get_db"
@@ -11,8 +12,17 @@ from repositories import DocumentRepository
 # Level 2: request/response shapes now live in schemas/ instead of this file.
 from schemas import DocumentResponse, ResearchExtraction, ResearchRequest
 
-from services.arxiv import fetch_arxiv_paper  # Level 1 fix: returns title/category too
-from services.extraction import extract_research as run_extraction
+# Level 2: outside-API code moved from services/ to clients/.
+from clients import fetch_arxiv_paper  # Level 1 fix: returns title/category too
+from clients import extract_research as run_extraction
+from core.exceptions import (
+    ArxivPaperNotFoundError,
+    ArxivUnavailableError,
+    InvalidArxivIdError,
+    LLMExtractionError,
+    LLMNotConfiguredError,
+    SynthError,
+)
 
 
 app = FastAPI(
@@ -20,6 +30,24 @@ app = FastAPI(
     description="A research intelligence backend",
     version="0.1.0",
 )
+
+
+# Level 2: the ONE place that decides which HTTP status each app error gets.
+# Clients/services raise plain Python errors; this turns them into responses
+# with the same codes and {"detail": "..."} body HTTPException used to produce.
+ERROR_STATUS_CODES: dict[type[SynthError], int] = {
+    InvalidArxivIdError: 400,
+    ArxivPaperNotFoundError: 404,
+    ArxivUnavailableError: 502,
+    LLMNotConfiguredError: 500,
+    LLMExtractionError: 502,
+}
+
+
+@app.exception_handler(SynthError)
+async def synth_error_handler(request: Request, exc: SynthError) -> JSONResponse:
+    status_code = ERROR_STATUS_CODES.get(type(exc), 500)  # unknown SynthError -> 500
+    return JSONResponse(status_code=status_code, content={"detail": str(exc)})
 
 
 @app.get("/documents", response_model=list[DocumentResponse])
