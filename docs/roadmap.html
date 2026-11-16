@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>synth — Roadmap</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0E2A43; --panel:#123A5C; --panel2:#0C2338;
+  --line:#5FA8C9; --line-soft:rgba(95,168,201,.28); --line-faint:rgba(95,168,201,.14);
+  --ink:#E9F3F9; --ink-muted:#8FB3C9; --amber:#E8A33D; --amber-soft:rgba(232,163,61,.18);
+  --font-head:'Space Grotesk',sans-serif; --font-body:'IBM Plex Sans',sans-serif; --font-mono:'JetBrains Mono',monospace;
+}
+:root:not([data-theme="dark"]) {
+  --bg:#F2EFE3; --panel:#FFFFFF; --panel2:#EAE5D4;
+  --line:#1B3A5C; --line-soft:rgba(27,58,92,.28); --line-faint:rgba(27,58,92,.12);
+  --ink:#122436; --ink-muted:#4C6478; --amber:#B5651D; --amber-soft:rgba(181,101,29,.14);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]) {
+    --bg:#0E2A43; --panel:#123A5C; --panel2:#0C2338;
+    --line:#5FA8C9; --line-soft:rgba(95,168,201,.28); --line-faint:rgba(95,168,201,.14);
+    --ink:#E9F3F9; --ink-muted:#8FB3C9; --amber:#E8A33D; --amber-soft:rgba(232,163,61,.18);
+  }
+}
+*{box-sizing:border-box;}
+html{scroll-padding-top:env(safe-area-inset-top,0px);}
+body{
+  margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-body);
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  background-image:
+    linear-gradient(var(--line-faint) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-faint) 1px, transparent 1px);
+  background-size:28px 28px;
+}
+.wrap{max-width:1180px; margin:0 auto; padding:28px 20px 80px;}
+header{
+  display:flex; align-items:flex-end; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  border-bottom:1px solid var(--line-soft); padding-bottom:18px; margin-bottom:22px;
+}
+.title{font-family:var(--font-head); font-weight:700; font-size:clamp(28px,4vw,42px); letter-spacing:-.01em; margin:0;}
+.title span{color:var(--line);}
+.subtitle{font-family:var(--font-mono); font-size:12.5px; color:var(--ink-muted); margin-top:6px; max-width:60ch;}
+.progress-box{font-family:var(--font-mono); font-size:12.5px; color:var(--ink-muted); text-align:right;}
+.progress-bar{width:200px; height:6px; background:var(--line-faint); border:1px solid var(--line-soft); margin-top:6px; position:relative;}
+.progress-fill{position:absolute; top:0; left:0; bottom:0; background:var(--amber); width:0%; transition:width .25s ease;}
+.layout{display:grid; grid-template-columns:230px 1fr; gap:24px;}
+@media (max-width:820px){.layout{grid-template-columns:1fr;}}
+nav.rail{border-right:1px solid var(--line-soft); padding-right:12px;}
+@media (max-width:820px){nav.rail{border-right:none; border-bottom:1px solid var(--line-soft); padding-right:0; padding-bottom:14px; margin-bottom:6px;}}
+.rail-list{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; position:relative;}
+@media (max-width:820px){.rail-list{flex-direction:row; overflow-x:auto; gap:2px; padding-bottom:4px;}}
+.rail-item{position:relative; padding:9px 10px 9px 26px; cursor:pointer; font-family:var(--font-mono); font-size:12.5px; color:var(--ink-muted); border-left:2px solid var(--line-soft); white-space:nowrap;}
+@media (max-width:820px){.rail-item{border-left:none; border-bottom:2px solid var(--line-soft); padding:8px 12px;}}
+.rail-item:hover{color:var(--ink);}
+.rail-item .node{position:absolute; left:-5px; top:11px; width:8px; height:8px; border-radius:50%; background:var(--bg); border:2px solid var(--line-soft);}
+@media (max-width:820px){.rail-item .node{display:none;}}
+.rail-item.active{color:var(--amber); font-weight:600;}
+.rail-item.active .node{border-color:var(--amber); background:var(--amber);}
+.rail-item.done{color:var(--line);}
+.rail-item .chk{display:inline-block; width:6px;}
+.rail-item.done::after{content:'✓'; margin-left:6px; color:var(--amber); font-weight:700;}
+main{min-height:400px;}
+.card{background:var(--panel); border:1px solid var(--line-soft); position:relative;}
+.card::before{content:''; position:absolute; inset:0; border:1px solid var(--line-faint); margin:5px; pointer-events:none;}
+.card-head{padding:22px 26px 16px; border-bottom:1px dashed var(--line-soft); display:flex; justify-content:space-between; align-items:flex-start; gap:14px; flex-wrap:wrap;}
+.level-tag{font-family:var(--font-mono); font-size:11.5px; color:var(--line); letter-spacing:.04em;}
+.level-title{font-family:var(--font-head); font-weight:700; font-size:24px; margin:4px 0 0;}
+.mark-btn{font-family:var(--font-mono); font-size:11.5px; border:1px solid var(--line-soft); background:transparent; color:var(--ink-muted); padding:7px 12px; cursor:pointer; white-space:nowrap;}
+.mark-btn.done{border-color:var(--amber); color:var(--amber); background:var(--amber-soft);}
+.body-grid{padding:20px 26px 26px; display:grid; grid-template-columns:1fr 1fr; gap:20px 28px;}
+@media (max-width:700px){.body-grid{grid-template-columns:1fr;}}
+.field{grid-column:1/-1;}
+.field.half{grid-column:span 1;}
+@media (max-width:700px){.field.half{grid-column:1/-1;}}
+.label{font-family:var(--font-mono); font-size:10.5px; letter-spacing:.06em; color:var(--line); margin-bottom:5px;}
+.value{font-size:14.5px; line-height:1.55;}
+.value code, .value a{color:var(--ink);}
+a{color:var(--line);}
+pre{
+  font-family:var(--font-mono); font-size:12.5px; line-height:1.5; background:var(--panel2);
+  border:1px solid var(--line-soft); padding:14px 16px; overflow-x:auto; margin:0; color:var(--ink-muted);
+}
+.repo-link{display:inline-block; margin-top:4px; font-family:var(--font-mono); font-size:13px; border:1px solid var(--line-soft); padding:6px 10px; text-decoration:none;}
+.repo-link:hover{border-color:var(--line);}
+footer{margin-top:32px; padding-top:16px; border-top:1px solid var(--line-soft); font-family:var(--font-mono); font-size:11.5px; color:var(--ink-muted);}
+.seed{font-size:13.5px; line-height:1.6; margin-bottom:18px; color:var(--ink-muted);}
+.seed b{color:var(--ink); font-weight:600;}
+::selection{background:var(--amber-soft);}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1 class="title">synth<span> · </span>roadmap</h1>
+      <div class="subtitle">One evolving backend. Fourteen levels. Level 0 → production-capable backend / ML / LLM engineer.</div>
+    </div>
+    <div class="progress-box">
+      <div id="progress-text">0 / 14 levels complete</div>
+      <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <nav class="rail"><ul class="rail-list" id="rail"></ul></nav>
+    <main id="main"></main>
+  </div>
+
+  <footer>synth — universal knowledge &amp; research intelligence platform, seeded on arXiv metadata. progress saved locally in this browser.</footer>
+</div>
+
+<script>
+const PROJECT_INTRO = {
+  tag: "PROJECT", title: "synth — the one repo you build for all 14 levels",
+  seed: `<b>The project:</b> a Universal Knowledge &amp; Research Intelligence Platform. A backend that ingests documents (papers, articles, raw text/URLs), extracts structured facts, indexes them for retrieval, and eventually runs multi-step research/analysis over them. Domain-neutral, with both structured data (extracted entities/metadata) and unstructured text (full content) — so every layer of this roadmap has a genuine reason to exist.<br><br>
+  <b>Seed data:</b> arXiv paper abstracts + metadata, pulled via arXiv's free public API. Real, freely redistributable, structured — gives natural entities to extract without inventing synthetic data, and keeps the repo public from day one.<br><br>
+  <b>Level 0 baseline:</b> a single FastAPI service, one endpoint — paste or fetch an arXiv abstract → an LLM extracts a structured summary + key entities as JSON. In-memory, no DB, no auth, no tests. Everything below builds on this same repo.`
+};
+
+const WORKFLOW = {
+  tag: "APPENDIX", title: "GitHub workflow, running alongside every level",
+  body: [
+    ["Branching", "main always deployable. One branch per level (level-3-auth, level-6-celery…). Merge only when that level's exit condition passes. Never branch off an unfinished level."],
+    ["Commits", "Per sub-step, not per level — \u201cadd refresh token rotation\u201d, \u201cadd revoke-all-sessions script.\u201d A readable history that itself demonstrates iterative engineering."],
+    ["Tags & releases", "Tag v0.1-postgres, v0.2-layered-arch, v0.3-auth… at each merge, so any level can be checked out and run in isolation."],
+    ["PRs against yourself", "Open a PR from each level-N branch into main even solo — what was added, the problem it solves, how it was tested."],
+    ["README", "Update it at every level: current architecture, how to run it, what's new. By Level 13 it's a system-design writeup."],
+    ["Issues as backlog", "Before starting a level, open an Issue with the exit condition as acceptance criteria; close it via the merge commit."],
+    ["CI from early on", "Minimal pytest-on-push starting Level 4, expanding each level — Docker build at L5, full deploy at L13."],
+    ["Keep it public", "arXiv data is freely redistributable — no reason to go private. A public, tagged commit history across 14 levels is a stronger signal than the finished app alone."]
+  ]
+};
+
+const LEVELS = [
+{ tag:"LEVEL 01", title:"Persistent State: PostgreSQL",
+  skill:"Relational schema design + async DB access patterns in a real service — connection pooling, migrations, transactions.",
+  tool:"PostgreSQL + SQLAlchemy 2.0 (async) + Alembic.",
+  added:"Replace in-memory storage with Postgres. Tables: <code>users</code> (stub), <code>sources</code> (arXiv IDs/URLs ingested), <code>documents</code>, <code>extractions</code> (LLM output: entities, summary, token counts, latency).",
+  problem:"The app loses all history on restart and can't answer \u201cwhat have we already extracted from this arXiv category.\u201d You need durable, queryable state and a migration story that doesn't break prod.",
+  project:"Add <code>/documents?category=cs.LG</code> and <code>/documents/{id}</code> endpoints backed by Postgres; write an Alembic migration adding a <code>review_status</code> enum to <code>extractions</code> without downtime (nullable → backfill → NOT NULL, three migrations).",
+  repo:{name:"tiangolo/full-stack-fastapi-template", url:"https://github.com/tiangolo/full-stack-fastapi-template", note:"study app/models.py + alembic/versions/"},
+  contribution:"Find an open Alembic/SQLAlchemy FastAPI starter with an issue tagged migration or schema and submit a fix (common — search \u201calembic downgrade\u201d bugs).",
+  exit:"App survives a restart with zero data loss; alembic upgrade head / downgrade -1 both run cleanly on a fresh DB; you can explain async sessions vs sync.",
+  arch:`[Client] -> [FastAPI app] -> [SQLAlchemy async session] -> [PostgreSQL]
+                 ^
+           [LLM API call] (unchanged, now logs to DB)` },
+
+{ tag:"LEVEL 02", title:"Proper FastAPI Architecture",
+  skill:"Layered service architecture — separating routing, business logic, and data access before the app collapses into one main.py.",
+  tool:"FastAPI APIRouter + Pydantic v2 settings + dependency injection (Depends).",
+  added:"Refactor into routers/, services/, repositories/, schemas/, core/config.py. Settings(BaseSettings) for env-based config (dev/staging/prod, arXiv API base URL, LLM keys). DB sessions injected via Depends(get_db).",
+  problem:"The single-file app is unmaintainable and every environment switch is a hand-edited constant. You need config-as-code and separation of concerns before adding more features.",
+  project:"Split synth into the layered structure above; add /health and /config-check endpoints reporting the active environment without leaking secrets.",
+  repo:{name:"zhanymkanov/fastapi-best-practices", url:"https://github.com/zhanymkanov/fastapi-best-practices", note:"a maintained list of exactly this pattern with reasoning per decision"},
+  contribution:"Open a PR on a small FastAPI OSS project restructuring one flat router file into a services/ layer.",
+  exit:"No business logic lives inside a route function; swapping Postgres for SQLite in tests only touches core/config.py and repositories/.",
+  arch:`[Client] -> [Router] -> [Service layer] -> [Repository layer] -> [PostgreSQL]
+                              |
+                        [LLM client wrapper]
+           [core/config.py] injected everywhere via Depends` },
+
+{ tag:"LEVEL 03", title:"Authentication & RBAC (hardened)",
+  skill:"Production auth patterns beyond a minimal setup — refresh token rotation, password hashing best practice, scoped permissions as data (not code).",
+  tool:"fastapi-users or hand-rolled JWT with passlib[bcrypt] + a permissions table.",
+  added:"users, roles, permissions tables; login/refresh/logout endpoints; a require_permission(\"ingest:document\") dependency instead of hardcoded role checks.",
+  problem:"Naive RBAC is role-string checks scattered across endpoints. Rebuild it as data-driven permissions so adding a role never means touching route code.",
+  project:"Roles: contributor (ingests sources), curator (approves/edits extractions), admin (manages users/sources). Lock down synth's endpoints accordingly; write a script that revokes all refresh tokens for a user.",
+  repo:{name:"fastapi-users/fastapi-users", url:"https://github.com/fastapi-users/fastapi-users", note:"read authentication/strategy/jwt.py"},
+  contribution:"Fix or improve documentation/an edge case around refresh-token expiry handling — approachable good-first-issues here.",
+  exit:"You can rotate a compromised refresh token, revoke all sessions for one user, and add a new role via a DB row with zero code changes.",
+  arch:`[Client] -> [Auth Depends] -> [Router] -> [Service] -> [Repository] -> [PostgreSQL]
+                     |
+          [permissions table] <- data-driven, not hardcoded` },
+
+{ tag:"LEVEL 04", title:"Testing & Logging",
+  skill:"Writing tests that actually catch regressions in async DB + LLM-call code, and structured logging you can query in prod.",
+  tool:"pytest + pytest-asyncio + httpx.AsyncClient; structlog for JSON logs.",
+  added:"tests/ with unit tests (services, mocked LLM + arXiv calls) and integration tests (real test DB via testcontainers). Structured JSON logs with request_id correlation replace print().",
+  problem:"A bad deploy is only caught in prod. You need CI-runnable tests and logs that trace one request end-to-end through auth → ingestion → extraction → DB write.",
+  project:"80%+ coverage on services/; mock both the LLM API and the arXiv API so the suite runs with no network calls or cost; request_id middleware appears in every log line for that request.",
+  repo:{name:"hynek/structlog", url:"https://github.com/hynek/structlog", note:"structured logging setup; also study encode/httpx's test suite for async patterns"},
+  contribution:"Add a missing test case or fix a flaky async test in a small FastAPI OSS repo — a very common, well-scoped first contribution.",
+  exit:"pytest runs green in under 30s without hitting a real LLM API; you can grep one request_id and see the full lifecycle of a request in logs.",
+  arch:`[Client] -> [request_id middleware] -> [Router] -> [Service] -> [Repository] -> [PostgreSQL]
+                                            |
+                                  [structured JSON logs]
+[tests/] -> mocks LLM + arXiv + test DB -> runs whole stack in CI` },
+
+{ tag:"LEVEL 05", title:"Containerization: Docker",
+  skill:"Reproducible environments and multi-service orchestration — the thing that makes \u201cworks on my machine\u201d disappear.",
+  tool:"Docker + Docker Compose.",
+  added:"Dockerfile (multi-stage: deps layer cached separately from app code) + docker-compose.yml running app + postgres together; .env files per environment.",
+  problem:"Manually managed environments don't scale past one developer. Environments become disposable containers with env-var-driven config, and a new contributor runs the whole stack with one command.",
+  project:"docker compose up brings up synth + Postgres + runs Alembic migrations automatically on startup; image size optimized with a multi-stage build (python:3.12-slim base).",
+  repo:{name:"tiangolo/full-stack-fastapi-template", url:"https://github.com/tiangolo/full-stack-fastapi-template", note:"its docker-compose.yml and Dockerfile"},
+  contribution:"Submit a PR shrinking a Python OSS project's Docker image (multi-stage build, .dockerignore fixes) — measurable and reviewable.",
+  exit:"Fresh clone -> docker compose up -> working app + migrated DB, no manual steps, image under ~300MB.",
+  arch:`[docker-compose]
+   +-- app container  (FastAPI, runs Alembic on startup)
+   +-- postgres container
+[Client] -> [app:8000] -> [postgres:5432]  (internal docker network)` },
+
+{ tag:"LEVEL 06", title:"Async Workloads: Redis + Celery",
+  skill:"Decoupling slow work (LLM calls, document fetching) from the request/response cycle — the single most common gap in junior backend work.",
+  tool:"Redis (broker + cache) + Celery.",
+  added:"Ingestion (fetch from arXiv + LLM extraction) moves to a Celery task; client gets a task_id immediately, polls /tasks/{id}. Redis also caches repeated extractions.",
+  problem:"Fetching a paper + running LLM extraction currently blocks the HTTP request and times out under load, especially when batch-ingesting a whole category. You need a queue.",
+  project:"Port ingest-and-extract into a Celery task with retry-on-failure (exponential backoff on arXiv rate limits and LLM errors) and a /tasks/{id} status endpoint; Redis caches so re-ingesting the same arXiv ID within 1hr returns the cached extraction.",
+  repo:{name:"testdrivenio/fastapi-celery", url:"https://github.com/testdrivenio/fastapi-celery", note:"the FastAPI-specific wiring; also study celery/celery examples"},
+  contribution:"Fix a documented Celery task-retry edge case or contribute a missing example to a FastAPI+Celery reference repo.",
+  exit:"You can kill a worker mid-task and the task retries cleanly; cache hit rate is visible in logs; API responds in <200ms even though the actual work takes 30s+.",
+  arch:`[Client] -> [FastAPI: enqueue task] -> [Redis broker] -> [Celery worker] -> [arXiv fetch / LLM extract]
+                ^                                              |
+         [task_id returned]                          [result -> PostgreSQL]
+[Redis also used as response cache, checked before enqueueing]` },
+
+{ tag:"LEVEL 07", title:"Data Pipelines: ETL + Airflow",
+  skill:"Orchestrated, scheduled, dependency-aware data pipelines — moving from \u201ca script that runs\u201d to \u201ca DAG that's monitored and retried.\u201d",
+  tool:"Apache Airflow.",
+  added:"A nightly DAG: polls the arXiv API for new papers in tracked categories, ingests + extracts them, computes aggregate metrics (extraction failure rate, avg confidence, papers/day), writes to daily_metrics, alerts on anomalies.",
+  problem:"You need scheduled, observable, retry-capable batch jobs — not a cron script that silently fails at 3am — to keep the corpus growing on its own.",
+  project:"Build dags/daily_ingest_dag.py with tasks fetch_new_papers → extract → load → validate, using PythonOperator calling into your existing services, XComs for small results between tasks, SLA misses configured.",
+  repo:{name:"apache/airflow", url:"https://github.com/apache/airflow", note:"airflow/example_dags/ directory"},
+  contribution:"Improve or fix an example DAG in Airflow's docs/examples, or contribute to a community Airflow provider package with an open issue.",
+  exit:"DAG runs on schedule in the Airflow UI, task failures retry per policy, and you can explain backfilling a DAG for a missed date range.",
+  arch:`[Airflow scheduler] -> DAG: fetch_new_papers -> extract -> load(daily_metrics) -> validate/alert
+                                                                                  |
+                                                                      [Airflow UI: monitoring, retries, SLAs]` },
+
+{ tag:"LEVEL 08", title:"Large-Scale Processing: PySpark",
+  skill:"Distributed data processing for when Pandas/single-node ETL stops being enough — partitioning, lazy evaluation, shuffle costs.",
+  tool:"PySpark (local cluster mode via Docker — no need for real EMR yet).",
+  added:"A Spark job that processes arXiv's full bulk metadata dump (a free ~2.7M-paper snapshot) — replacing the Airflow DAG's pandas transform with Spark for heavy aggregation (papers per category/year, co-authorship, trending terms).",
+  problem:"The daily_metrics DAG's pandas step won't scale once you move from \u201cpapers you've ingested\u201d to \u201cthe entire arXiv corpus\u201d for trend analysis. You need partitioned processing that can run on a real cluster later.",
+  project:"Rewrite the Level 7 transform as a PySpark job (spark-submit) reading the arXiv bulk metadata JSON, aggregating category/year trends at scale, writing results back to Postgres; benchmark against the pandas version.",
+  repo:{name:"apache/spark", url:"https://github.com/apache/spark", note:"examples/src/main/python/ directory"},
+  contribution:"Contribute a PySpark example or fix a stale one in a community Spark-with-Docker starter repo.",
+  exit:"You can explain — and demonstrate — why a given transform is slow (partition skew, unnecessary shuffle, wide vs narrow transformation) and fix it.",
+  arch:`[Airflow DAG] -> transform task now calls -> [spark-submit job]
+                                                    |
+                                    [PySpark: read arXiv bulk JSON -> partition/aggregate -> write back]` },
+
+{ tag:"LEVEL 09", title:"Model Lifecycle: MLflow + Serving",
+  skill:"Treating a model (even a small one) as a versioned, tracked, servable artifact — not a notebook output.",
+  tool:"MLflow (tracking + model registry) + a serving layer (mlflow models serve or FastAPI-wrapped inference).",
+  added:"Train a small classifier on accumulated extractions data predicting \u201cis this extraction low-confidence / needs curator review?\u201d Track experiments in MLflow; register the best version; serve behind /predict.",
+  problem:"You need a reproducible record of which model version is in production, what data/params produced it, and a rollback path when a new version underperforms.",
+  project:"Train 3+ versions (different hyperparams/features) logged to MLflow; promote the best to \u201cProduction\u201d in the registry; synth's /predict loads whichever version is tagged Production at startup, with /model-info reporting the active version.",
+  repo:{name:"mlflow/mlflow", url:"https://github.com/mlflow/mlflow", note:"examples/ directory, model registry examples"},
+  contribution:"Fix a bug or add a missing example in MLflow's examples folder — clearly labeled good-first-issues.",
+  exit:"You can roll back synth's active model to a previous MLflow-registered version with a config change, no redeploy of training code.",
+  arch:`[Training script] -> logs params/metrics/artifacts -> [MLflow Tracking Server]
+                                                              |
+                                                     [MLflow Model Registry]
+                                                              |
+[synth /predict endpoint] -> loads "Production"-tagged model at startup` },
+
+{ tag:"LEVEL 10", title:"Retrieval: Embeddings + pgvector + RAG",
+  skill:"Real retrieval-augmented generation — chunking strategy, embedding choice, vector search tuning, not just \u201ccall an embeddings API once.\u201d",
+  tool:"pgvector (extension on your existing Postgres) + an embeddings model.",
+  added:"documents gets a vector column; a chunking + embedding pipeline processes ingested arXiv abstracts (and full text where available). /query does similarity search + passes top-k chunks into the LLM call as context.",
+  problem:"LLM calls are currently context-free. You need grounded answers over your own ingested paper corpus, with retrieval quality you can measure — not just \u201cit feels better.\u201d",
+  project:"Chunk + embed every ingested abstract (and full text where downloaded); implement cosine similarity search plus a hybrid keyword+vector fallback; evaluate precision@k on a hand-labeled set of 20-30 questions like \u201cwhich papers discuss X technique for Y problem.\u201d",
+  repo:{name:"pgvector/pgvector", url:"https://github.com/pgvector/pgvector", note:"also study langchain-ai/langchain's PGVector integration for chunking/retrieval wiring"},
+  contribution:"Improve documentation or fix an edge case in a pgvector Python client wrapper, or contribute a chunking-strategy example to a RAG starter repo.",
+  exit:"You have a measured precision@k number for your retrieval, not a vibe; retrieval latency is logged and under a stated budget (e.g. <200ms for top-5).",
+  arch:`[Ingested abstracts/full text] -> [Chunker] -> [Embedding model] -> [PostgreSQL + pgvector]
+                                                        |
+[Client] -> [/query] -> [vector similarity search] -> [top-k chunks] -> [LLM call w/ context] -> [response]` },
+
+{ tag:"LEVEL 11", title:"Production LLM Backend",
+  skill:"Making the LLM-calling layer itself production-grade — provider abstraction, cost/token accounting, streaming, rate-limit handling, prompt versioning.",
+  tool:"A provider-agnostic client layer (litellm or hand-rolled) + streaming via SSE.",
+  added:"llm_client.py abstracts provider calls (swap providers by config, not code); streaming responses for /query answers; per-request token/cost logging into extractions; prompt templates versioned in prompts/.",
+  problem:"Switching LLM providers or tracking spend per request currently means editing code. You need an abstraction boundary and cost visibility before this becomes an agentic system with many more calls.",
+  project:"Add streaming to /query (token-by-token via SSE); exponential-backoff retry on rate-limit errors; a /costs?since= endpoint aggregating spend from logged token counts; version-tag every prompt template (extraction prompt, answer-drafting prompt).",
+  repo:{name:"BerriAI/litellm", url:"https://github.com/BerriAI/litellm", note:"read its provider-abstraction and retry/fallback logic"},
+  contribution:"Add support for a missing provider parameter or fix a retry-logic edge case in litellm — actively maintained, frequent well-scoped PRs merged.",
+  exit:"You can switch the active LLM provider via one config value with zero code changes, and produce an accurate per-day cost report from logged data alone.",
+  arch:`[Client] -> [/query, SSE stream] -> [llm_client.py: provider-agnostic, versioned prompts]
+                                                |
+                                    [Provider A / Provider B / local model]  (config-selected)
+                                                |
+                              [logged: tokens, cost, latency, prompt_version] -> PostgreSQL` },
+
+{ tag:"LEVEL 12", title:"Agentic Systems: LangGraph",
+  skill:"Going from single LLM calls to stateful, tool-using, multi-step agent workflows with proper checkpointing and failure recovery.",
+  tool:"LangGraph, with Postgres as the checkpoint store.",
+  added:"A new agent workflow — research question → retrieve via RAG → draft literature-review-style answer → self-critique/verify claims → finalize — as a LangGraph graph. Checkpoints persisted to Postgres so a crashed run resumes instead of restarting.",
+  problem:"Multi-step agent runs are long, can fail partway, and need human-in-the-loop review points — you need durable, resumable state, not an in-memory graph run.",
+  project:"Build a research agent: takes a question, retrieves context (Level 10), drafts a synthesized answer citing specific papers, runs a self-critique node checking each claim is actually supported by a retrieved chunk (loops back to retrieval if not), and a human-review interrupt before finalizing — all checkpointed to Postgres.",
+  repo:{name:"langchain-ai/langgraph", url:"https://github.com/langchain-ai/langgraph", note:"examples/ — the Postgres checkpointer and human-in-the-loop examples"},
+  contribution:"Contribute an example or fix a checkpointer bug in langgraph — active repo, examples folder frequently accepts additions.",
+  exit:"You can kill the process mid-agent-run and resume from the last checkpoint with correct state; the self-critique loop measurably improves output quality on a small eval set.",
+  arch:`[Client] -> [/agent/run] -> [LangGraph graph]
+                              +-- retrieve node -> calls /query (Level 10)
+                              +-- draft node -> calls llm_client.py (Level 11)
+                              +-- critique node -> conditional loop back to retrieve
+                              +-- human-review interrupt -> resumes on approval
+                              all state checkpointed -> PostgreSQL` },
+
+{ tag:"LEVEL 13", title:"CI/CD, AWS & Monitoring",
+  skill:"Full production deployment lifecycle — automated test/build/deploy pipeline, cloud infra, and observability that alerts before users complain.",
+  tool:"GitHub Actions (CI/CD) + AWS (ECS/Fargate, RDS, ElastiCache) + Prometheus/Grafana.",
+  added:".github/workflows/ci.yml running tests -> build image -> push to ECR -> deploy to ECS on merge to main; Postgres -> RDS, Redis -> ElastiCache; /metrics endpoint (Prometheus format); Grafana dashboard + alert rules.",
+  problem:"Everything so far has run locally/Docker Compose. You need automated deploys with rollback, managed infra that survives a box dying, and alerts that fire before a user notices an outage.",
+  project:"Full pipeline: push -> CI runs Level 4's test suite -> builds image -> deploys to ECS Fargate behind an ALB; RDS Postgres + ElastiCache Redis replace the Compose versions; Grafana dashboard tracking the metrics above with an alert on error-rate spike or queue backlog.",
+  repo:{name:"jsporna/fastapi-ecs-fargate", url:"https://github.com/jsporna/fastapi-ecs-fargate", note:"a clean, minimal FastAPI + Dockerfile + Terraform IaC + GitHub Actions reference for ECS Fargate + ALB; also study prometheus/client_python for /metrics instrumentation"},
+  contribution:"The fastapi-ecs-fargate reference is intentionally a bare \u201cHello World\u201d — contribute a PR adding a realistic addition (a health-check-driven rolling deploy example, or RDS wired via Terraform) so it becomes a more complete teaching reference; or contribute a FastAPI+Celery instrumentation example to prometheus/client_python — genuinely under-documented.",
+  exit:"A git push to main results in a zero-downtime deploy with automatic rollback on failed health checks; a simulated load spike triggers a Grafana alert within your defined SLA.",
+  arch:`[GitHub push] -> [CI: test/build] -> [ECR] -> [CD: deploy] -> [ECS Fargate: synth app + Celery workers]
+                                                                    |
+                        [RDS PostgreSQL + pgvector]  [ElastiCache Redis]  [Airflow (MWAA or self-hosted)]
+                                                                    |
+                [Client] -> [ALB] -> [synth: auth -> agent graph -> RAG -> LLM -> model serving]
+                                                                    |
+                                              [/metrics] -> [Prometheus] -> [Grafana + Alerts]` },
+];
+
+const STORE_KEY = 'synth-roadmap-progress-v1';
+function loadProgress(){ try{ return JSON.parse(localStorage.getItem(STORE_KEY)) || {}; }catch(e){ return {}; } }
+function saveProgress(p){ try{ localStorage.setItem(STORE_KEY, JSON.stringify(p)); }catch(e){} }
+let progress = loadProgress();
+let current = 0; // 0 = intro, 1..14 = levels, 15 = workflow
+
+const rail = document.getElementById('rail');
+const railLabels = ['START', ...LEVELS.map((l,i)=>'L'+String(i).padStart(2,'0')), 'FLOW'];
+railLabels.forEach((label, idx)=>{
+  const li = document.createElement('li');
+  li.className = 'rail-item';
+  li.innerHTML = '<span class="node"></span>' + label + (idx>0 && idx<=LEVELS.length ? ' — ' + LEVELS[idx-1].title.split(':')[0] : (idx===0 ? ' — overview' : ' — workflow'));
+  li.dataset.idx = idx;
+  li.addEventListener('click', ()=> render(idx));
+  rail.appendChild(li);
+});
+
+function updateProgressUI(){
+  const done = Object.values(progress).filter(Boolean).length;
+  document.getElementById('progress-text').textContent = done + ' / ' + LEVELS.length + ' levels complete';
+  document.getElementById('progress-fill').style.width = Math.round(done/LEVELS.length*100) + '%';
+  [...rail.children].forEach((li, idx)=>{
+    li.classList.toggle('active', idx===current);
+    li.classList.toggle('done', idx>0 && idx<=LEVELS.length && !!progress[idx-1]);
+  });
+}
+
+function render(idx){
+  current = idx;
+  const main = document.getElementById('main');
+  if(idx===0){
+    main.innerHTML = `<div class="card"><div class="card-head"><div><div class="level-tag">${PROJECT_INTRO.tag}</div><div class="level-title">${PROJECT_INTRO.title}</div></div></div>
+    <div class="body-grid"><div class="field seed">${PROJECT_INTRO.seed}</div></div></div>`;
+  } else if(idx > LEVELS.length){
+    const rows = WORKFLOW.body.map(([h,t])=>`<div class="field half"><div class="label">${h.toUpperCase()}</div><div class="value">${t}</div></div>`).join('');
+    main.innerHTML = `<div class="card"><div class="card-head"><div><div class="level-tag">${WORKFLOW.tag}</div><div class="level-title">${WORKFLOW.title}</div></div></div>
+    <div class="body-grid">${rows}</div></div>`;
+  } else {
+    const l = LEVELS[idx-1];
+    const isDone = !!progress[idx-1];
+    main.innerHTML = `<div class="card">
+      <div class="card-head">
+        <div><div class="level-tag">${l.tag}</div><div class="level-title">${l.title}</div></div>
+        <button class="mark-btn ${isDone?'done':''}" id="mark-btn">${isDone ? '✓ Complete' : 'Mark complete'}</button>
+      </div>
+      <div class="body-grid">
+        <div class="field half"><div class="label">SKILL</div><div class="value">${l.skill}</div></div>
+        <div class="field half"><div class="label">PRIMARY TOOL</div><div class="value">${l.tool}</div></div>
+        <div class="field"><div class="label">WHAT GETS ADDED</div><div class="value">${l.added}</div></div>
+        <div class="field"><div class="label">ENGINEERING PROBLEM</div><div class="value">${l.problem}</div></div>
+        <div class="field"><div class="label">CONCRETE PROJECT</div><div class="value">${l.project}</div></div>
+        <div class="field half"><div class="label">OSS REPO TO STUDY</div><div class="value">${l.repo.note}<br><a class="repo-link" href="${l.repo.url}" target="_blank" rel="noopener">${l.repo.name} ↗</a></div></div>
+        <div class="field half"><div class="label">OSS CONTRIBUTION IDEA</div><div class="value">${l.contribution}</div></div>
+        <div class="field"><div class="label">EXIT CONDITION</div><div class="value">${l.exit}</div></div>
+        <div class="field"><div class="label">ARCHITECTURE</div><pre>${l.arch}</pre></div>
+      </div>
+    </div>`;
+    document.getElementById('mark-btn').addEventListener('click', ()=>{
+      progress[idx-1] = !progress[idx-1];
+      saveProgress(progress);
+      render(idx);
+    });
+  }
+  updateProgressUI();
+}
+
+render(0);
+</script>
+</body>
+</html>

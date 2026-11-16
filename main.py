@@ -1,4 +1,4 @@
-
+import asyncio
 import json
 from uuid import uuid4
 from datetime import datetime
@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from db import get_db
 from models import Source, Document, Extraction, ReviewStatus
 
-from services.arxiv import fetch_arxiv_abstract
+from services.arxiv import fetch_arxiv_paper  # Level 1 fix: returns title/category too
 from services.extraction import (
     ResearchExtraction,
     extract_research as run_extraction,
@@ -145,15 +145,45 @@ async def extract_endpoint(
     # Step 1: Obtain the abstract.
     if request.abstract is not None:
         abstract = request.abstract
+        # Level 1 fix: pasted text has no metadata, so leave these empty.
+        title = None
+        category = None
         source_type = "manual"
         source_identifier = f"manual:{uuid4()}"
     else:
-        abstract = fetch_arxiv_abstract(request.arxiv_id)
+        # Level 1 fix: the same arXiv ID was being re-fetched, re-sent to the
+        # LLM and saved again. Look it up first and return the stored result.
+        existing = await db.execute(
+            select(Extraction)
+            .join(Document)                 # extraction -> its document
+            .join(Source)                   # document -> its source (has the arXiv ID)
+            .where(
+                Source.source_type == "arxiv",
+                Source.source_identifier == request.arxiv_id,
+            )
+            .order_by(Extraction.id.desc())  # newest extraction first
+            .limit(1)
+        )
+        previous = existing.scalar_one_or_none()
+
+        if previous is not None:
+            # Already ingested: skip arXiv, the LLM and the inserts.
+            return ResearchExtraction(
+                summary=previous.summary,
+                key_entities=json.loads(previous.key_entities),
+            )
+
+        # Level 1 fix: keep arXiv's title/category instead of discarding them.
+        # Level 1 fix: run blocking calls in a thread so the server isn't frozen.
+        paper = await asyncio.to_thread(fetch_arxiv_paper, request.arxiv_id)
+        abstract = paper.abstract
+        title = paper.title
+        category = paper.category
         source_type = "arxiv"
         source_identifier = request.arxiv_id
 
     # Step 2: Generate the LLM extraction.
-    result, token_count, latency = run_extraction(abstract)
+    result, token_count, latency = await asyncio.to_thread(run_extraction, abstract)
 
     try:
         # Step 3: Create the source record.
@@ -170,6 +200,9 @@ async def extract_endpoint(
         document = Document(
             source_id=source.id,
             abstract=abstract,
+            # Level 1 fix: save metadata so /documents?category= works.
+            title=title,
+            category=category,
         )
 
         db.add(document)
