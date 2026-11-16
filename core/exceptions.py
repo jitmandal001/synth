@@ -9,6 +9,16 @@ class SynthError(Exception):
     """Base class for every expected Synth error. The message is safe to show users."""
 
 
+# ---- requests and documents (raised by services) ----
+
+class InvalidExtractionRequestError(SynthError):
+    """POST /extract got both or neither of abstract and arxiv_id."""
+
+
+class DocumentNotFoundError(SynthError):
+    """No document exists with the requested id."""
+
+
 # ---- arXiv ----
 
 class InvalidArxivIdError(SynthError):
