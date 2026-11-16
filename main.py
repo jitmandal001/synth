@@ -9,7 +9,7 @@ from fastapi import FastAPI, HTTPException, Depends  #BaseModel comes from Pydan
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from db import get_db
+from core.database import get_db  # Level 2: was "from db import get_db"
 from models import Source, Document, Extraction, ReviewStatus
 
 from services.arxiv import fetch_arxiv_paper  # Level 1 fix: returns title/category too

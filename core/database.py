@@ -1,3 +1,5 @@
+# Level 2: moved from db.py to core/database.py. It's infrastructure (like config),
+# so it lives in core/. Contents unchanged; only import paths elsewhere changed.
 from collections.abc import AsyncGenerator
 # SQLAlchemy -> Connects Python code to the database so you can query, write, and map tables to Python classes.
 # alembic -> Handles database migrations, allowing you to version control your database schema changes.

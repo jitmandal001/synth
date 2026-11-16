@@ -8,8 +8,8 @@ from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from core.config import get_settings
-from db import Base
-import models  # Registers all SQLAlchemy models
+from core.database import Base  # Level 2: was "from db import Base"
+import models  # Registers all SQLAlchemy models (models/__init__.py imports each table)
 
 
 config = context.config
