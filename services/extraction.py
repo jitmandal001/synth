@@ -4,16 +4,12 @@ import time
 
 from fastapi import HTTPException
 from openai import OpenAI
-from pydantic import BaseModel
 
 from core.config import get_settings
+# Level 2: the LLM output shape moved to schemas/ with the other API schemas.
+from schemas.extraction import ResearchExtraction
 
 MAX_ATTEMPTS = 3
-
-
-class ResearchExtraction(BaseModel):
-    summary: str
-    key_entities: list[str]
 
 
 def extract_research(abstract: str) -> tuple[ResearchExtraction, int | None, float]:

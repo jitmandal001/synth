@@ -1,22 +1,19 @@
 import asyncio
 import json
 from uuid import uuid4
-from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from fastapi import FastAPI, HTTPException, Depends  #BaseModel comes from Pydantic. It is the parent class that provides data validation, type checking, and serialization.
-from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from core.database import get_db  # Level 2: was "from db import get_db"
 from models import Source, Document, Extraction, ReviewStatus
+# Level 2: request/response shapes now live in schemas/ instead of this file.
+from schemas import DocumentResponse, ResearchExtraction, ResearchRequest
 
 from services.arxiv import fetch_arxiv_paper  # Level 1 fix: returns title/category too
-from services.extraction import (
-    ResearchExtraction,
-    extract_research as run_extraction,
-)
+from services.extraction import extract_research as run_extraction
 
 
 app = FastAPI(
@@ -25,58 +22,6 @@ app = FastAPI(
     version="0.1.0",
 )
 
-
-class ResearchRequest(BaseModel):
-    abstract: str | None = Field(
-        default=None,
-        min_length=1,
-        description="Paste a research paper abstract",
-    )
-    arxiv_id: str | None = Field(
-        default=None,
-        description="arXiv paper ID, e.g. 1706.03762",
-    )
-
-class ExtractionResponse(BaseModel):
-    id: int
-    summary: str
-    key_entities: list[str]
-    token_count: int | None
-    latency: float | None
-    review_status: str
-    created_at: datetime
-
-
-class DocumentResponse(BaseModel):
-    id: int
-    source_id: int
-    title: str | None
-    abstract: str
-    category: str | None
-    created_at: datetime
-    extractions: list[ExtractionResponse]
-
-def format_document(document: Document) -> DocumentResponse:
-    return DocumentResponse(
-        id=document.id,
-        source_id=document.source_id,
-        title=document.title,
-        abstract=document.abstract,
-        category=document.category,
-        created_at=document.created_at,
-        extractions=[
-            ExtractionResponse(
-                id=extraction.id,
-                summary=extraction.summary,
-                key_entities=json.loads(extraction.key_entities),
-                token_count=extraction.token_count,
-                latency=extraction.latency,
-                review_status=extraction.review_status.value,
-                created_at=extraction.created_at,
-            )
-            for extraction in document.extractions
-        ],
-    )
 
 @app.get("/documents", response_model=list[DocumentResponse])
 async def get_documents(
@@ -95,7 +40,8 @@ async def get_documents(
     result = await db.execute(query)
     documents = result.scalars().all()
 
-    return [format_document(document) for document in documents]
+    # Level 2: from_attributes in DocumentResponse replaces format_document().
+    return [DocumentResponse.model_validate(document) for document in documents]
 
 
 @app.get("/documents/{document_id}", response_model=DocumentResponse)
@@ -118,7 +64,7 @@ async def get_document(
             detail="Document not found",
         )
 
-    return format_document(document)
+    return DocumentResponse.model_validate(document)
 
 @app.get("/")
 def home():
