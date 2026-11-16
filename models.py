@@ -8,6 +8,7 @@ from sqlalchemy import (
     Integer,
     Float,
     ForeignKey,
+    UniqueConstraint,
     DateTime,
     func,
 )
@@ -37,7 +38,14 @@ class User(Base):
 
 class Source(Base):
     __tablename__ = "sources"
-
+    # Level 1 fix: the same source can't be stored twice.
+    __table_args__ = (
+        UniqueConstraint(
+            "source_type",
+            "source_identifier",
+            name="uq_sources_type_identifier",
+        ),
+    )
     id: Mapped[int] = mapped_column(primary_key=True)
     user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.id")
@@ -98,7 +106,8 @@ class Extraction(Base):
     document: Mapped["Document"] = relationship(
         back_populates="extractions"
     )
-    review_status: Mapped[ReviewStatus | None] = mapped_column(
+    # Level 1 fix: column is NOT NULL, so the type shouldn't allow None.
+    review_status: Mapped[ReviewStatus] = mapped_column(
     Enum(
         ReviewStatus,
         name="review_status",
