@@ -1,0 +1,457 @@
+<title>Synth Architecture Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a circuit-board style layer map (columns = layers, left→right = request direction), detail rail beside it, database schema cards below. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #16202b;
+  --muted: #5b6676;
+  --line: #d9dfe8;
+  --soft: #edf1f6;
+  --edge: #b9c2cf;
+  --hot: #d2551f;
+  --hot2: #1f5fbf;
+  --l-entry: #3d4a5c;
+  --l-router: #1f5fbf;
+  --l-service: #7a45c4;
+  --l-data: #0e7f72;
+  --l-client: #b0700d;
+  --l-schema: #b8326b;
+  --l-core: #4f5d70;
+  --l-ext: #2c6e3a;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141a; --surface: #161c24; --ink: #e5eaf1; --muted: #9aa5b4; --line: #29313c; --soft: #1d242e; --edge: #3a4452;
+    --hot: #ff8a57; --hot2: #7ea7ff;
+    --l-entry: #a9b6c8; --l-router: #7ea7ff; --l-service: #b998f2; --l-data: #4fc7b7; --l-client: #e6b04f; --l-schema: #f07aa8; --l-core: #9fb0c4; --l-ext: #79cf86;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #161c24; --ink: #e5eaf1; --muted: #9aa5b4; --line: #29313c; --soft: #1d242e; --edge: #3a4452;
+  --hot: #ff8a57; --hot2: #7ea7ff;
+  --l-entry: #a9b6c8; --l-router: #7ea7ff; --l-service: #b998f2; --l-data: #4fc7b7; --l-client: #e6b04f; --l-schema: #f07aa8; --l-core: #9fb0c4; --l-ext: #79cf86;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.55; }
+.wrap {
+  max-width: 1320px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+  display: flex; flex-direction: column; gap: 20px;
+}
+.eyebrow { font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0; letter-spacing: -.01em; text-wrap: balance; }
+h2 { font-family: var(--font-display); font-size: 20px; margin: 0; text-wrap: balance; }
+h3 { font-family: var(--font-display); font-size: 16px; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 72ch; }
+code, .mono { font-family: var(--font-mono); font-size: .88em; }
+header { display: flex; flex-direction: column; gap: 6px; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.stat { font: 500 12.5px var(--font-mono); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; color: var(--muted); }
+.stat b { color: var(--ink); font-weight: 600; }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls .label { font: 500 12px var(--font-mono); color: var(--muted); margin-right: 4px; }
+.btn { font: 500 13.5px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn:focus-visible, .node:focus-visible { outline: 2px solid var(--hot); outline-offset: 3px; }
+
+/* map + rail */
+.mapgrid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: 16px; align-items: start; }
+@media (max-width: 1080px) { .mapgrid { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.map { overflow-x: auto; }
+.map svg { display: block; min-width: 1000px; width: 100%; height: auto; }
+.colhead { font: 600 11px var(--font-mono); letter-spacing: .08em; fill: var(--muted); text-transform: uppercase; }
+.node { cursor: pointer; }
+.node rect.box { fill: var(--surface); stroke-width: 1.5; }
+.node text { font: 500 11.5px var(--font-mono); fill: var(--ink); pointer-events: none; }
+.node text.sub { font-size: 10px; fill: var(--muted); }
+.node.dim { opacity: .28; }
+.node.sel rect.box { stroke-width: 3; }
+.edge { fill: none; stroke: var(--edge); stroke-width: 1.3; }
+.edge.runtime { stroke-dasharray: 5 4; }
+.edge.rel { stroke-dasharray: 2 3; }
+.edge.dim { opacity: .12; }
+.edge.out { stroke: var(--hot); stroke-width: 2.2; opacity: 1; }
+.edge.in { stroke: var(--hot2); stroke-width: 2.2; opacity: 1; }
+.edge.flow { stroke: var(--hot); stroke-width: 2.6; opacity: 1; }
+.stepnum { font: 700 11px var(--font-mono); fill: var(--bg); }
+.stepdot { fill: var(--hot); }
+
+.rail { padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.rail .path { font: 600 14px var(--font-mono); overflow-wrap: anywhere; }
+.chip { display: inline-flex; align-items: center; gap: 6px; font: 600 11.5px var(--font-mono); padding: 1px 9px; border-radius: 999px; border: 1.5px solid currentColor; }
+.rail ul, .rail ol { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
+.rail li code { font-size: 12px; }
+.rail .sect { display: flex; flex-direction: column; gap: 6px; }
+.rail .k { font: 500 11.5px var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12.5px; color: var(--muted); padding: 10px 14px; border-top: 1px solid var(--line); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 11px; height: 11px; border-radius: 3px; border: 2px solid currentColor; display: inline-block; }
+.ln { width: 26px; height: 0; border-top: 2px solid var(--edge); display: inline-block; }
+.ln.d { border-top-style: dashed; } .ln.o { border-color: var(--hot); } .ln.i { border-color: var(--hot2); }
+
+/* database */
+.dbhead { display: flex; justify-content: space-between; align-items: end; gap: 12px; flex-wrap: wrap; }
+.tables { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 1080px) { .tables { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .tables { grid-template-columns: minmax(0, 1fr); } }
+.tbl { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; overflow: hidden; min-width: 0; display: flex; flex-direction: column; }
+.tbl.future { border-style: dashed; background: var(--soft); }
+.tbl .th { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--line); }
+.tbl .th b { font: 600 13.5px var(--font-mono); }
+.tbl .th span { font: 500 11.5px var(--font-mono); color: var(--muted); white-space: nowrap; }
+.col { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto; gap: 6px; align-items: baseline; padding: 4px 12px; font: 12px var(--font-mono); border-top: 1px solid var(--soft); }
+.col:first-of-type { border-top: 0; }
+.col .t { color: var(--muted); font-size: 11px; text-align: right; overflow-wrap: anywhere; }
+.col .n { overflow-wrap: anywhere; }
+.badge { font: 700 9.5px var(--font-mono); border-radius: 4px; padding: 0 4px; text-align: center; border: 1px solid currentColor; }
+.b-pk { color: var(--l-client); } .b-fk { color: var(--l-router); } .b-uq { color: var(--l-service); }
+.tbl .foot { margin-top: auto; padding: 8px 12px; font-size: 12px; color: var(--muted); border-top: 1px solid var(--line); background: var(--soft); }
+.rels { font: 13px var(--font-mono); padding: 12px 14px; overflow-x: auto; white-space: pre; }
+.access { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.access th, .access td { text-align: left; padding: 8px 12px; border-top: 1px solid var(--line); vertical-align: top; }
+.access th { font: 600 11.5px var(--font-mono); color: var(--muted); text-transform: uppercase; letter-spacing: .05em; border-top: 0; }
+.tablewrap { overflow-x: auto; }
+.op { font: 600 11px var(--font-mono); padding: 1px 6px; border-radius: 4px; background: var(--soft); white-space: nowrap; }
+.note { font-size: 13.5px; color: var(--muted); border-left: 3px solid var(--l-client); padding-left: 12px; }
+</style>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">synth · level-3-auth branch · same code as v0.2-layered-arch</div>
+    <h1>Synth Architecture Map</h1>
+    <p class="lede">Every box is a real file, every line a real import. Click a file to see what it uses (orange) and what uses it (blue). Pick a flow to trace one request through the layers.</p>
+    <div class="stats">
+      <span class="stat"><b>30</b> Python files</span>
+      <span class="stat"><b>6</b> endpoints</span>
+      <span class="stat"><b>4</b> tables + alembic_version</span>
+      <span class="stat">DB at <b>fa3786d6e67b</b> (head)</span>
+      <span class="stat">rows: <b>0</b> users · <b>2</b> sources · <b>2</b> documents · <b>2</b> extractions</span>
+    </div>
+  </header>
+
+  <div class="controls" role="group" aria-label="Trace a flow">
+    <span class="label">TRACE</span>
+    <button class="btn" id="flow-none" data-flow="none" aria-pressed="true">All imports</button>
+    <button class="btn" id="flow-extract" data-flow="extract" aria-pressed="false">POST /extract (new paper)</button>
+    <button class="btn" id="flow-dup" data-flow="dup" aria-pressed="false">POST /extract (already saved)</button>
+    <button class="btn" id="flow-docs" data-flow="docs" aria-pressed="false">GET /documents</button>
+    <button class="btn" id="flow-error" data-flow="error" aria-pressed="false">Error: arXiv down</button>
+    <button class="btn" id="flow-startup" data-flow="startup" aria-pressed="false">App startup</button>
+    <button class="btn" id="flow-alembic" data-flow="alembic" aria-pressed="false">alembic upgrade</button>
+  </div>
+
+  <div class="mapgrid">
+    <section class="card" aria-label="File connection map">
+      <div class="map"><svg id="map" viewBox="0 0 1230 760" role="img" aria-label="Import graph of the synth codebase"></svg></div>
+      <div class="legend">
+        <span><span class="sw" style="color:var(--l-router)"></span>routers</span>
+        <span><span class="sw" style="color:var(--l-service)"></span>services</span>
+        <span><span class="sw" style="color:var(--l-data)"></span>repositories + models</span>
+        <span><span class="sw" style="color:var(--l-client)"></span>clients</span>
+        <span><span class="sw" style="color:var(--l-schema)"></span>schemas</span>
+        <span><span class="sw" style="color:var(--l-core)"></span>core</span>
+        <span><span class="sw" style="color:var(--l-ext)"></span>outside the code</span>
+        <span><span class="ln"></span>imports</span>
+        <span><span class="ln d"></span>talks to at runtime</span>
+        <span><span class="ln o"></span>uses</span>
+        <span><span class="ln i"></span>used by</span>
+      </div>
+    </section>
+
+    <aside class="card rail" id="rail" aria-live="polite"></aside>
+  </div>
+
+  <section style="display:flex;flex-direction:column;gap:14px">
+    <div class="dbhead">
+      <div>
+        <div class="eyebrow">PostgreSQL · synth_db</div>
+        <h2>Database tables</h2>
+      </div>
+      <button class="btn" id="toggle-l3" aria-pressed="false">Show Level 3 tables (planned)</button>
+    </div>
+
+    <div class="card rels" id="rels">users 1 ──&lt; sources 1 ── 1 documents 1 ──&lt; extractions
+        (user_id, nullable)   (source_id, unique)   (document_id)</div>
+
+    <div class="tables" id="tables"></div>
+
+    <div class="card">
+      <div style="padding:14px 14px 4px"><h3>Which code touches which table</h3></div>
+      <div class="tablewrap">
+        <table class="access">
+          <thead><tr><th>Code</th><th>SQL</th><th>Tables</th><th>Called from</th></tr></thead>
+          <tbody>
+            <tr><td><code>DocumentRepository.list_documents()</code></td><td><span class="op">SELECT</span></td><td>documents + extractions (selectinload)</td><td>GET /documents</td></tr>
+            <tr><td><code>DocumentRepository.get_document()</code></td><td><span class="op">SELECT</span></td><td>documents + extractions</td><td>GET /documents/{id}</td></tr>
+            <tr><td><code>DocumentRepository.find_latest_extraction()</code></td><td><span class="op">SELECT … JOIN</span></td><td>extractions → documents → sources</td><td>POST /extract (arXiv duplicate check)</td></tr>
+            <tr><td><code>DocumentRepository.save_extraction()</code></td><td><span class="op">INSERT ×3</span> <span class="op">COMMIT</span></td><td>sources, documents, extractions (one transaction)</td><td>POST /extract</td></tr>
+            <tr><td><code>alembic/env.py</code></td><td><span class="op">DDL</span></td><td>all tables + alembic_version</td><td><code>alembic upgrade / downgrade / check</code></td></tr>
+            <tr><td><code>scripts/check_db.py</code></td><td><span class="op">SELECT 1-row</span></td><td>none (current_database())</td><td>you, from the terminal</td></tr>
+            <tr><td><em>nothing yet</em></td><td>—</td><td>users</td><td>Level 3 will add login, roles and tokens</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <p class="note">Every database call goes through <code>core/database.py</code>: <code>get_db()</code> opens one session per request, <code>core/dependencies.py</code> hands it to <code>DocumentRepository</code>, and only the repository runs SQL.</p>
+  </section>
+</div>
+
+<script>
+(function () {
+  const W = 168, H = 36;
+  const L = { entry: "--l-entry", router: "--l-router", service: "--l-service", data: "--l-data", client: "--l-client", schema: "--l-schema", core: "--l-core", ext: "--l-ext" };
+  const X = [20, 220, 420, 620, 820, 1040];
+
+  const N = [
+    { id: "main", path: "main.py", x: X[0], y: 330, layer: "entry", lines: 19, what: "Creates the FastAPI app, registers the error handler and includes the three routers. Nothing else.", run: "uvicorn main:app" },
+    { id: "errh", path: "core/error_handlers.py", x: X[0], y: 560, layer: "core", lines: 36, what: "ERROR_STATUS_CODES table + one handler that turns any SynthError into a JSON error response with the right status." },
+    { id: "chk", path: "scripts/check_db.py", x: X[0], y: 680, layer: "core", lines: 27, what: "Terminal script: connects through core/database.py and prints the database name and user.", run: "python scripts/check_db.py" },
+
+    { id: "rh", path: "routers/health.py", x: X[1], y: 130, layer: "router", lines: 43, what: "GET /, GET /health, GET /config-check. config-check reads Settings and returns them without secrets." },
+    { id: "rx", path: "routers/extraction.py", x: X[1], y: 330, layer: "router", lines: 19, what: "POST /extract. Receives ResearchRequest, gets IngestionService from Depends, calls service.extract()." },
+    { id: "rd", path: "routers/documents.py", x: X[1], y: 450, layer: "router", lines: 26, what: "GET /documents and GET /documents/{id}. Gets DocumentService from Depends and calls it." },
+    { id: "exc", path: "core/exceptions.py", x: X[1], y: 600, layer: "core", lines: 43, what: "SynthError and its subclasses (InvalidExtractionRequest, DocumentNotFound, InvalidArxivId, ArxivPaperNotFound, ArxivUnavailable, LLMNotConfigured, LLMExtraction). No imports: everyone else imports it." },
+
+    { id: "dep", path: "core/dependencies.py", x: X[2], y: 130, layer: "core", lines: 32, what: "Provider chain FastAPI runs per request: get_db → get_document_repository → get_document_service / get_ingestion_service." },
+    { id: "si", path: "services/ingestion_service.py", x: X[2], y: 330, layer: "service", lines: 68, what: "The /extract recipe: exactly-one-input rule → duplicate lookup → arXiv fetch → LLM → save. Blocking clients run via asyncio.to_thread." },
+    { id: "sd", path: "services/document_service.py", x: X[2], y: 450, layer: "service", lines: 22, what: "Lists documents and gets one by id; raises DocumentNotFoundError for unknown ids. Converts ORM rows with DocumentResponse.model_validate." },
+
+    { id: "ca", path: "clients/arxiv_client.py", x: X[3], y: 130, layer: "client", lines: 84, what: "fetch_arxiv_paper(): calls the arXiv API, parses the Atom XML, returns abstract, title and category. Raises arXiv errors, never HTTPException." },
+    { id: "cl", path: "clients/llm_client.py", x: X[3], y: 230, layer: "client", lines: 98, what: "extract_research(): calls OpenRouter with the configured model, retries up to 3 times on unusable output, returns (ResearchExtraction, token_count, latency)." },
+    { id: "repo", path: "repositories/document_repository.py", x: X[3], y: 450, layer: "data", lines: 118, what: "The only file that runs SQL: list_documents, get_document, find_latest_extraction, save_extraction (one transaction, rollback on error)." },
+    { id: "cfg", path: "core/config.py", x: X[3], y: 650, layer: "core", lines: 42, what: "Settings(BaseSettings): environment, database_url (SecretStr), openrouter_api_key, llm_model, base URLs. get_settings() is cached." },
+
+    { id: "sx", path: "schemas/extraction.py", x: X[4], y: 190, layer: "schema", lines: 55, what: "ResearchRequest (POST body), ResearchExtraction (LLM output + /extract response), ExtractionResponse (from_attributes; parses JSON entities, enum → string)." },
+    { id: "sdoc", path: "schemas/document.py", x: X[4], y: 260, layer: "schema", lines: 23, what: "DocumentResponse, read straight from a Document row (from_attributes), with its extractions nested." },
+    { id: "mu", path: "models/user.py", x: X[4], y: 360, layer: "data", lines: 28, what: "User table (stub): id, email, created_at. Not used by any endpoint yet. Level 3 extends it." },
+    { id: "ms", path: "models/source.py", x: X[4], y: 410, layer: "data", lines: 44, what: "Source table: where the abstract came from (arxiv / manual). Unique (source_type, source_identifier)." },
+    { id: "mdoc", path: "models/document.py", x: X[4], y: 460, layer: "data", lines: 35, what: "Document table: abstract, title, category. One per source." },
+    { id: "mx", path: "models/extraction.py", x: X[4], y: 510, layer: "data", lines: 50, what: "Extraction table + ReviewStatus enum: summary, key_entities (JSON text), token_count, latency, review_status." },
+    { id: "db", path: "core/database.py", x: X[4], y: 650, layer: "core", lines: 41, what: "Async engine (connection pool), SessionLocal, Base for all models, get_db() = one session per request." },
+
+    { id: "arxiv", path: "arXiv API", x: X[5], y: 130, layer: "ext", sub: "export.arxiv.org", what: "Outside service. Returns Atom XML for an arXiv ID." },
+    { id: "llm", path: "OpenRouter LLM", x: X[5], y: 230, layer: "ext", sub: "openrouter/free", what: "Outside service. Turns an abstract into JSON: summary + key_entities." },
+    { id: "pg", path: "PostgreSQL", x: X[5], y: 430, layer: "ext", sub: "synth_db · asyncpg", what: "The database. 4 tables + alembic_version. Only reached through core/database.py sessions." },
+    { id: "alem", path: "alembic/env.py", x: X[5], y: 560, layer: "core", lines: 86, what: "Runs migrations: reads the URL from Settings, imports models so Base.metadata knows every table.", run: "alembic upgrade head" },
+    { id: "env", path: ".env", x: X[5], y: 650, layer: "ext", sub: "not in git", what: "Your local settings: DATABASE_URL, OPENROUTER_API_KEY, ENVIRONMENT. Read by Settings; real environment variables override it." },
+  ];
+  const byId = Object.fromEntries(N.map(n => [n.id, n]));
+
+  // [from, to, kind] — kind: import | runtime | rel
+  const E = [
+    ["main", "rh"], ["main", "rx"], ["main", "rd"], ["main", "errh"],
+    ["errh", "exc"],
+    ["rh", "cfg"],
+    ["rx", "dep"], ["rx", "si"], ["rx", "sx"],
+    ["rd", "dep"], ["rd", "sd"], ["rd", "sdoc"],
+    ["dep", "db"], ["dep", "repo"], ["dep", "si"], ["dep", "sd"],
+    ["si", "ca"], ["si", "cl"], ["si", "repo"], ["si", "sx"], ["si", "exc"],
+    ["sd", "repo"], ["sd", "sdoc"], ["sd", "exc"],
+    ["ca", "cfg"], ["ca", "exc"], ["ca", "arxiv", "runtime"],
+    ["cl", "cfg"], ["cl", "exc"], ["cl", "sx"], ["cl", "llm", "runtime"],
+    ["repo", "ms"], ["repo", "mdoc"], ["repo", "mx"], ["repo", "pg", "runtime"],
+    ["sdoc", "sx"],
+    ["mu", "db"], ["ms", "db"], ["mdoc", "db"], ["mx", "db"],
+    ["mu", "ms", "rel"], ["ms", "mdoc", "rel"], ["mdoc", "mx", "rel"],
+    ["db", "cfg"], ["db", "pg", "runtime"],
+    ["cfg", "env", "runtime"],
+    ["alem", "cfg"], ["alem", "db"], ["alem", "mu"], ["alem", "pg", "runtime"],
+    ["chk", "db"],
+  ].map(([a, b, k]) => ({ a, b, k: k || "import" }));
+
+  const FLOWS = {
+    extract: { title: "POST /extract with a new arXiv ID", nodes: ["main", "rx", "dep", "db", "repo", "si", "pg", "ca", "arxiv", "cl", "llm", "sx"],
+      path: [["main","rx"],["rx","dep"],["dep","db"],["dep","repo"],["dep","si"],["si","repo"],["repo","pg"],["si","ca"],["ca","arxiv"],["si","cl"],["cl","llm"],["cl","sx"]],
+      steps: ["main.py routes the request to routers/extraction.py", "Depends builds get_db → DocumentRepository → IngestionService", "service checks exactly one of abstract / arxiv_id", "repo.find_latest_extraction() → SELECT … JOIN → not found", "fetch_arxiv_paper() in a thread → arXiv API → abstract, title, category", "extract_research() in a thread → OpenRouter → validated as ResearchExtraction", "repo.save_extraction() → INSERT sources, documents, extractions → COMMIT", "ResearchExtraction returned as JSON (≈10 s, mostly the LLM)"] },
+    dup: { title: "POST /extract with an arXiv ID already saved", nodes: ["main", "rx", "dep", "db", "repo", "si", "pg", "sx"],
+      path: [["main","rx"],["rx","dep"],["dep","db"],["dep","repo"],["dep","si"],["si","repo"],["repo","pg"],["si","sx"]],
+      steps: ["main.py → routers/extraction.py", "Depends builds the repository and IngestionService", "repo.find_latest_extraction() finds the stored row", "ExtractionResponse parses the stored JSON entities", "Returned in ≈0.003 s: no arXiv call, no LLM call, no INSERT"] },
+    docs: { title: "GET /documents?category=cs.CL", nodes: ["main", "rd", "dep", "db", "repo", "sd", "pg", "sdoc", "sx"],
+      path: [["main","rd"],["rd","dep"],["dep","db"],["dep","repo"],["dep","sd"],["sd","repo"],["repo","pg"],["sd","sdoc"],["sdoc","sx"]],
+      steps: ["main.py → routers/documents.py", "Depends builds the repository and DocumentService", "repo.list_documents('cs.CL') → SELECT documents + extractions", "DocumentResponse.model_validate() reads each row (from_attributes)", "List of documents returned, newest first"] },
+    error: { title: "POST /extract while arXiv is unreachable", nodes: ["main", "rx", "dep", "si", "ca", "arxiv", "exc", "errh"],
+      path: [["main","rx"],["rx","dep"],["dep","si"],["si","ca"],["ca","arxiv"],["ca","exc"],["main","errh"],["errh","exc"]],
+      steps: ["service calls fetch_arxiv_paper()", "network error → client raises ArxivUnavailableError (from core/exceptions.py)", "the error passes up through the service and router untouched", "core/error_handlers.py catches SynthError, looks up 502", "{\"detail\": \"Could not fetch the abstract from arXiv.\"} with status 502; nothing saved"] },
+    startup: { title: "uvicorn main:app (startup)", nodes: ["main", "errh", "exc", "rh", "rx", "rd", "dep", "db", "cfg", "env"],
+      path: [["main","errh"],["errh","exc"],["main","rh"],["main","rx"],["main","rd"],["rx","dep"],["dep","db"],["db","cfg"],["cfg","env"]],
+      steps: ["Python imports main.py, which imports the routers", "routers import dependencies → database → config", "get_settings() reads .env once and validates it (fails here if DATABASE_URL is missing)", "core/database.py creates the engine (connection pool), no connection opened yet", "error handler registered, routers included, server listening"] },
+    alembic: { title: "alembic upgrade head", nodes: ["alem", "cfg", "env", "db", "mu", "ms", "mdoc", "mx", "pg"],
+      path: [["alem","cfg"],["cfg","env"],["alem","db"],["alem","mu"],["mu","ms"],["ms","mdoc"],["mdoc","mx"],["alem","pg"]],
+      steps: ["alembic runs alembic/env.py", "env.py gets DATABASE_URL from Settings (same as the app)", "import models registers all 4 tables on Base.metadata", "connects to Postgres, runs each pending migration's upgrade()", "alembic_version updated (currently fa3786d6e67b)"] },
+  };
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("map");
+  function el(t, a, p) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+
+  // column headings
+  [["ENTRY", X[0]], ["ROUTERS", X[1]], ["SERVICES", X[2]], ["CLIENTS · REPOS", X[3]], ["SCHEMAS · MODELS", X[4]], ["OUTSIDE THE CODE", X[5]]]
+    .forEach(([t, x]) => { el("text", { x: x + 2, y: 40, class: "colhead" }, svg).textContent = t; });
+  el("text", { x: X[0] + 2, y: 588 - 40, class: "colhead" }, svg).textContent = "CORE (used everywhere)";
+
+  const defs = el("defs", {}, svg);
+  [["a-def", "var(--edge)"], ["a-out", "var(--hot)"], ["a-in", "var(--hot2)"]].forEach(([id, c]) => {
+    const m = el("marker", { id, viewBox: "0 0 10 10", refX: 9, refY: 5, markerWidth: 6, markerHeight: 6, orient: "auto-start-reverse" }, defs);
+    el("path", { d: "M0 0L10 5L0 10z", fill: c }, m);
+  });
+
+  const nh = n => (n.id === "pg" ? 70 : H);
+  function edgePath(a, b) {
+    const ah = nh(a), bh = nh(b);
+    const ay = a.y + ah / 2, by = b.y + bh / 2;
+    if (b.x > a.x) { const x1 = a.x + W, x2 = b.x; const dx = Math.max(30, (x2 - x1) / 2); return `M${x1} ${ay}C${x1 + dx} ${ay} ${x2 - dx} ${by} ${x2} ${by}`; }
+    if (b.x < a.x) { const x1 = a.x, x2 = b.x + W; const dx = Math.max(30, (x1 - x2) / 2); return `M${x1} ${ay}C${x1 - dx} ${ay} ${x2 + dx} ${by} ${x2} ${by}`; }
+    const down = b.y > a.y, y1 = down ? a.y + ah : a.y, y2 = down ? b.y : b.y + bh, cx = a.x + W / 2;
+    if (Math.abs(b.y - a.y) <= 60) return `M${cx} ${y1}L${cx} ${y2}`;
+    return `M${a.x + W} ${ay}C${a.x + W + 45} ${ay} ${b.x + W + 45} ${by} ${b.x + W} ${by}`;
+  }
+
+  const gE = el("g", {}, svg), gN = el("g", {}, svg), gS = el("g", {}, svg);
+  E.forEach(e => { e.el = el("path", { d: edgePath(byId[e.a], byId[e.b]), class: `edge ${e.k === "import" ? "" : e.k}`, "marker-end": "url(#a-def)" }, gE); });
+
+  N.forEach(n => {
+    const g = el("g", { class: "node", tabindex: 0, role: "button", "aria-label": n.path }, gN);
+    const h = nh(n);
+    el("rect", { class: "box", x: n.x, y: n.y, width: W, height: h, rx: n.layer === "ext" ? 18 : 7, stroke: `var(${L[n.layer]})` }, g);
+    el("rect", { x: n.x, y: n.y + 6, width: 4, height: h - 12, rx: 2, fill: `var(${L[n.layer]})` }, g);
+    const t = el("text", { x: n.x + 12, y: n.y + (n.sub ? h / 2 - 2 : h / 2 + 4) }, g);
+    t.textContent = n.path.length > 25 ? "…" + n.path.slice(-24) : n.path;
+    if (n.sub) { const s = el("text", { x: n.x + 12, y: n.y + h / 2 + 12, class: "sub" }, g); s.textContent = n.sub; }
+    if (n.lines) { const s = el("text", { x: n.x + W - 8, y: n.y + h / 2 + 4, class: "sub", "text-anchor": "end" }, g); s.textContent = n.lines; }
+    n.g = g;
+    g.addEventListener("click", () => selectNode(n.id));
+    g.addEventListener("keydown", ev => { if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); selectNode(n.id); } });
+  });
+
+  const rail = document.getElementById("rail");
+  const layerName = { entry: "entry point", router: "router (HTTP layer)", service: "service (business logic)", data: "data layer", client: "client (outside API)", schema: "schema (API shape)", core: "core (shared infrastructure)", ext: "outside the code" };
+  function clear() {
+    N.forEach(n => n.g.classList.remove("dim", "sel"));
+    E.forEach(e => { e.el.classList.remove("dim", "out", "in", "flow"); e.el.setAttribute("marker-end", "url(#a-def)"); });
+    gS.textContent = "";
+  }
+  function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+  function selectNode(id) {
+    setFlowButtons("none");
+    clear();
+    const n = byId[id];
+    const outs = E.filter(e => e.a === id), ins = E.filter(e => e.b === id);
+    const near = new Set([id, ...outs.map(e => e.b), ...ins.map(e => e.a)]);
+    N.forEach(m => { if (!near.has(m.id)) m.g.classList.add("dim"); });
+    n.g.classList.add("sel");
+    E.forEach(e => {
+      if (e.a === id) { e.el.classList.add("out"); e.el.setAttribute("marker-end", "url(#a-out)"); }
+      else if (e.b === id) { e.el.classList.add("in"); e.el.setAttribute("marker-end", "url(#a-in)"); }
+      else e.el.classList.add("dim");
+    });
+    const verb = k => k === "runtime" ? " (at runtime)" : k === "rel" ? " (relationship)" : "";
+    rail.innerHTML = `
+      <div class="eyebrow">Selected file</div>
+      <div class="path">${esc(n.path)}</div>
+      <div><span class="chip" style="color:var(${L[n.layer]})">${layerName[n.layer]}</span>${n.lines ? ` <span class="stat">${n.lines} lines</span>` : ""}</div>
+      <p>${esc(n.what)}</p>
+      ${n.run ? `<div class="sect"><div class="k">Run</div><code>${esc(n.run)}</code></div>` : ""}
+      <div class="sect"><div class="k" style="color:var(--hot)">Uses (${outs.length})</div>${outs.length ? `<ul>${outs.map(e => `<li><code>${esc(byId[e.b].path)}</code>${verb(e.k)}</li>`).join("")}</ul>` : "<p class='lede'>Nothing: it's a leaf.</p>"}</div>
+      <div class="sect"><div class="k" style="color:var(--hot2)">Used by (${ins.length})</div>${ins.length ? `<ul>${ins.map(e => `<li><code>${esc(byId[e.a].path)}</code>${verb(e.k)}</li>`).join("")}</ul>` : "<p class='lede'>Nothing imports it: it's an entry point.</p>"}</div>`;
+  }
+
+  function showFlow(key) {
+    clear();
+    if (key === "none") { showIntro(); return; }
+    const f = FLOWS[key];
+    const on = new Set(f.nodes);
+    N.forEach(n => { if (!on.has(n.id)) n.g.classList.add("dim"); });
+    const pairs = new Set(f.path.map(([a, b]) => a + ">" + b));
+    E.forEach(e => {
+      if (pairs.has(e.a + ">" + e.b)) { e.el.classList.add("flow"); e.el.setAttribute("marker-end", "url(#a-out)"); }
+      else e.el.classList.add("dim");
+    });
+    f.nodes.forEach((id, i) => {
+      const n = byId[id];
+      el("circle", { cx: n.x + W - 2, cy: n.y + 2, r: 9, class: "stepdot" }, gS);
+      el("text", { x: n.x + W - 2, y: n.y + 6, "text-anchor": "middle", class: "stepnum" }, gS).textContent = i + 1;
+    });
+    rail.innerHTML = `
+      <div class="eyebrow">Tracing a flow</div>
+      <h3>${esc(f.title)}</h3>
+      <ol>${f.steps.map(s => `<li>${esc(s)}</li>`).join("")}</ol>
+      <p class="lede" style="font-size:13px">Numbers on the boxes show the order files are reached. Click any box to inspect it.</p>`;
+  }
+
+  function showIntro() {
+    rail.innerHTML = `
+      <div class="eyebrow">How to read this</div>
+      <h3>Requests flow left to right</h3>
+      <p>A request enters at <code>main.py</code>, goes through a <b>router</b>, then a <b>service</b>, which uses a <b>repository</b> (database) and <b>clients</b> (outside APIs). <b>Core</b> files along the bottom are shared by everyone.</p>
+      <div class="sect"><div class="k">Rules the arrows obey</div>
+      <ul>
+        <li>Routers never import repositories or models.</li>
+        <li>Only the repository runs SQL; only clients call outside APIs.</li>
+        <li>Nothing below the routers imports FastAPI's HTTPException.</li>
+        <li><code>core/exceptions.py</code> imports nothing; everything can import it.</li>
+      </ul></div>
+      <p class="lede" style="font-size:13px">Click a file, or pick a flow above.</p>`;
+  }
+
+  function setFlowButtons(key) { document.querySelectorAll("[data-flow]").forEach(b => b.setAttribute("aria-pressed", b.dataset.flow === key ? "true" : "false")); }
+  document.querySelectorAll("[data-flow]").forEach(b => b.addEventListener("click", () => { setFlowButtons(b.dataset.flow); showFlow(b.dataset.flow); }));
+  showIntro();
+
+  // ---------------- database ----------------
+  const T = [
+    { name: "users", rows: 0, model: "models/user.py", cols: [["PK","id","integer"],["UQ","email","varchar(255) not null"],["","created_at","timestamptz = now()"]], foot: "Stub: no endpoint uses it yet." },
+    { name: "sources", rows: 2, model: "models/source.py", cols: [["PK","id","integer"],["FK","user_id → users.id","integer, nullable"],["","source_type","varchar(50)"],["","source_identifier","varchar(500) not null"],["","created_at","timestamptz = now()"]], foot: "UNIQUE (source_type, source_identifier) uq_sources_type_identifier: one row per arXiv ID." },
+    { name: "documents", rows: 2, model: "models/document.py", cols: [["PK","id","integer"],["FK UQ","source_id → sources.id","integer, unique"],["","title","varchar(500)"],["","abstract","text not null"],["","category","varchar(100)"],["","created_at","timestamptz = now()"]], foot: "One document per source. Rows: id 1 Attention, id 3 BERT (cs.CL)." },
+    { name: "extractions", rows: 2, model: "models/extraction.py", cols: [["PK","id","integer"],["FK","document_id → documents.id","integer not null"],["","summary","text not null"],["","key_entities","text (JSON list)"],["","token_count","integer"],["","latency","float"],["","review_status","enum not null"],["","created_at","timestamptz = now()"]], foot: "review_status ∈ pending · approved · rejected (3 migrations: nullable → backfill → NOT NULL)." },
+  ];
+  const T3 = [
+    { name: "users (+ new columns)", model: "Level 3", cols: [["","hashed_password","varchar"],["","is_active","boolean"]], foot: "Existing table, two new columns." },
+    { name: "roles", model: "Level 3", cols: [["PK","id","integer"],["UQ","name","contributor · curator · admin"]], foot: "A role is a named bundle of permissions." },
+    { name: "permissions", model: "Level 3", cols: [["PK","id","integer"],["UQ","name","e.g. ingest:document"]], foot: "One row per action." },
+    { name: "user_roles", model: "Level 3", cols: [["FK","user_id → users.id",""],["FK","role_id → roles.id",""]], foot: "Many-to-many: users ↔ roles." },
+    { name: "role_permissions", model: "Level 3", cols: [["FK","role_id → roles.id",""],["FK","permission_id → permissions.id",""]], foot: "Many-to-many: roles ↔ permissions." },
+    { name: "refresh_tokens", model: "Level 3", cols: [["PK","id","integer"],["FK","user_id → users.id",""],["UQ","token_hash","sha256, never the token"],["","family_id","one per login"],["","expires_at",""],["","revoked_at","null = still valid"]], foot: "Stored so tokens can be rotated and revoked." },
+  ];
+  function badge(b) {
+    return b.split(" ").filter(Boolean).map(x => `<span class="badge b-${x.toLowerCase()}">${x}</span>`).join(" ") || "";
+  }
+  function renderTables(showL3) {
+    const box = document.getElementById("tables");
+    const list = showL3 ? [...T, ...T3] : T;
+    box.innerHTML = list.map(t => `
+      <div class="tbl${t.model === "Level 3" ? " future" : ""}">
+        <div class="th"><b>${esc(t.name)}</b><span>${t.model === "Level 3" ? "planned" : `${t.rows} rows · ${esc(t.model)}`}</span></div>
+        ${t.cols.map(([b, n, ty]) => `<div class="col"><span>${badge(b)}</span><span class="n">${esc(n)}</span><span class="t">${esc(ty)}</span></div>`).join("")}
+        <div class="foot">${esc(t.foot)}</div>
+      </div>`).join("");
+    document.getElementById("rels").textContent = showL3
+      ? "users 1 ──< sources 1 ── 1 documents 1 ──< extractions\nusers >──< roles >──< permissions      (via user_roles, role_permissions)\nusers 1 ──< refresh_tokens"
+      : "users 1 ──< sources 1 ── 1 documents 1 ──< extractions\n      (user_id, nullable)   (source_id, unique)   (document_id)";
+  }
+  const tg = document.getElementById("toggle-l3");
+  tg.addEventListener("click", () => {
+    const on = tg.getAttribute("aria-pressed") !== "true";
+    tg.setAttribute("aria-pressed", on ? "true" : "false");
+    tg.textContent = on ? "Hide Level 3 tables" : "Show Level 3 tables (planned)";
+    renderTables(on);
+  });
+  renderTables(false);
+})();
+</script>

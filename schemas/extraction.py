@@ -1,3 +1,6 @@
+# POST /extract path, step 3 of 10: FastAPI checks the JSON body against
+# ResearchRequest before the route runs. ResearchExtraction is the reply shape.
+# (ExtractionResponse is also used on this path, by the service's duplicate check.)
 import json
 from datetime import datetime
 from enum import Enum
@@ -8,12 +11,12 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 class ResearchRequest(BaseModel):
     """Body of POST /extract. The route checks that exactly one field is set."""
 
-    abstract: str | None = Field(
-        default=None,
-        min_length=1,
+    abstract: str | None = Field(                 # optional pasted abstract
+        default=None,                             # missing → None
+        min_length=1,                             # "" is rejected with 422
         description="Paste a research paper abstract",
     )
-    arxiv_id: str | None = Field(
+    arxiv_id: str | None = Field(                 # optional arXiv ID
         default=None,
         description="arXiv paper ID, e.g. 1706.03762",
     )
@@ -22,8 +25,8 @@ class ResearchRequest(BaseModel):
 class ResearchExtraction(BaseModel):
     """What the LLM must return, and what POST /extract responds with."""
 
-    summary: str
-    key_entities: list[str]
+    summary: str                                  # one-paragraph summary
+    key_entities: list[str]                       # list of names/terms
 
 
 class ExtractionResponse(BaseModel):

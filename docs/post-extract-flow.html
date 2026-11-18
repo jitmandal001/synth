@@ -1,0 +1,334 @@
+<title>POST /extract Call Tree</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: a debugger-style call tree (indent = "called by"), scenario switch on top, run summary beside it. */
+:root {
+  --bg: #f3f5f8;
+  --surface: #ffffff;
+  --ink: #16202b;
+  --muted: #5b6676;
+  --line: #d9dfe8;
+  --soft: #edf1f6;
+  --guide: #c9d1dc;
+  --hot: #d2551f;
+  --err: #b42318;
+  --ok: #217a3c;
+  --l-ext: #2c6e3a;
+  --l-entry: #3d4a5c;
+  --l-router: #1f5fbf;
+  --l-schema: #b8326b;
+  --l-core: #4f5d70;
+  --l-service: #7a45c4;
+  --l-data: #0e7f72;
+  --l-client: #b0700d;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141a; --surface: #161c24; --ink: #e5eaf1; --muted: #9aa5b4; --line: #29313c; --soft: #1d242e; --guide: #34404e;
+    --hot: #ff8a57; --err: #ff7b6e; --ok: #6fd18a;
+    --l-ext: #79cf86; --l-entry: #a9b6c8; --l-router: #7ea7ff; --l-schema: #f07aa8; --l-core: #9fb0c4; --l-service: #b998f2; --l-data: #4fc7b7; --l-client: #e6b04f;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #161c24; --ink: #e5eaf1; --muted: #9aa5b4; --line: #29313c; --soft: #1d242e; --guide: #34404e;
+  --hot: #ff8a57; --err: #ff7b6e; --ok: #6fd18a;
+  --l-ext: #79cf86; --l-entry: #a9b6c8; --l-router: #7ea7ff; --l-schema: #f07aa8; --l-core: #9fb0c4; --l-service: #b998f2; --l-data: #4fc7b7; --l-client: #e6b04f;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.eyebrow { font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0; letter-spacing: -.01em; }
+h2 { font-family: var(--font-display); font-size: 18px; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 70ch; }
+code { font-family: var(--font-mono); font-size: .88em; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.seg { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.btn { font: 500 13.5px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; cursor: pointer; display: inline-flex; gap: 8px; align-items: baseline; }
+.btn small { font: 500 11.5px var(--font-mono); color: var(--muted); }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn[aria-pressed="true"] small { color: var(--bg); opacity: .75; }
+.btn:focus-visible, .caret:focus-visible { outline: 2px solid var(--hot); outline-offset: 2px; }
+.toggle { font-size: 13.5px; display: inline-flex; gap: 6px; align-items: center; color: var(--muted); margin-left: 6px; cursor: pointer; }
+
+.layout { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; align-items: start; }
+@media (max-width: 980px) { .layout { grid-template-columns: minmax(0, 1fr); } }
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.treebox { padding: 14px 10px 18px; overflow-x: auto; }
+.tree, .tree ul { list-style: none; margin: 0; padding: 0; }
+.tree ul { margin-left: 15px; padding-left: 16px; border-left: 1.5px solid var(--guide); }
+@media (max-width: 560px) { .tree ul { margin-left: 8px; padding-left: 10px; } }
+.tree li { position: relative; padding-top: 6px; min-width: 0; }
+.tree ul > li::before { content: ""; position: absolute; left: -16px; top: 24px; width: 12px; border-top: 1.5px solid var(--guide); }
+@media (max-width: 560px) { .tree ul > li::before { left: -10px; width: 7px; } }
+
+.node { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 6px; align-items: start; padding: 6px 8px; border-radius: 9px; min-width: 260px; }
+.node:hover { background: var(--soft); }
+.caret { width: 22px; height: 22px; border: 0; background: none; color: var(--muted); cursor: pointer; border-radius: 6px; font: 600 12px var(--font-mono); padding: 0; margin-top: 1px; }
+.caret[disabled] { cursor: default; opacity: .35; }
+.body { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.head { display: flex; flex-wrap: wrap; gap: 6px 8px; align-items: baseline; }
+.step { font: 700 11px var(--font-mono); color: var(--bg); background: var(--hot); border-radius: 5px; padding: 0 5px; min-width: 22px; text-align: center; font-variant-numeric: tabular-nums; }
+.file { font: 600 11px var(--font-mono); padding: 1px 7px; border-radius: 999px; border: 1.5px solid currentColor; white-space: nowrap; }
+.fn { font: 600 13.5px var(--font-mono); overflow-wrap: anywhere; }
+.tag { font: 600 10.5px var(--font-mono); padding: 1px 6px; border-radius: 5px; background: var(--soft); color: var(--muted); white-space: nowrap; }
+.tag.wait { color: var(--hot); }
+.tag.thread { color: var(--l-client); }
+.tag.time { color: var(--ok); }
+.by { font-size: 12.5px; color: var(--muted); }
+.by code { color: var(--ink); }
+.note { font-size: 13.5px; }
+.code { font: 12px/1.55 var(--font-mono); background: var(--soft); border-radius: 7px; padding: 6px 9px; white-space: pre; overflow-x: auto; color: var(--ink); max-width: 100%; }
+.errs { display: flex; flex-direction: column; gap: 2px; }
+.errline { font: 12px var(--font-mono); color: var(--err); }
+.errline b { font-weight: 700; }
+.off > .node { opacity: .32; }
+.off > .node .step { background: var(--guide); }
+.phase > .node { padding-block: 2px; }
+.phase > .node .fn { font: 600 11.5px var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.noerrs .errs { display: none; }
+
+.summary { padding: 16px; display: flex; flex-direction: column; gap: 14px; position: sticky; top: max(12px, env(safe-area-inset-top, 0px)); }
+.summary dl { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 6px 12px; margin: 0; font-size: 13.5px; }
+.summary dt { color: var(--muted); }
+.summary dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.big { font: 600 26px var(--font-display); font-variant-numeric: tabular-nums; }
+.legend { display: flex; flex-direction: column; gap: 5px; font-size: 12.5px; color: var(--muted); }
+.legend span { display: flex; align-items: center; gap: 7px; }
+.dotl { width: 10px; height: 10px; border-radius: 50%; display: inline-block; flex: none; }
+.req { font: 12.5px var(--font-mono); background: var(--soft); border-radius: 8px; padding: 8px 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:6px">
+    <div class="eyebrow">synth · v0.2-layered-arch · routers/extraction.py</div>
+    <h1>POST /extract Call Tree</h1>
+    <p class="lede">Every line is a real call in the code. Indented calls are made by the line above them. Numbers show the order things run for the request you pick; faded lines don't run for that request.</p>
+  </header>
+
+  <div class="controls">
+    <div class="seg" role="group" aria-label="Choose the request">
+      <button class="btn" id="sc-B2" data-sc="B2" aria-pressed="true">New arXiv ID <small>~10 s</small></button>
+      <button class="btn" id="sc-B1" data-sc="B1" aria-pressed="false">Already-saved arXiv ID <small>~0.003 s</small></button>
+      <button class="btn" id="sc-A" data-sc="A" aria-pressed="false">Pasted abstract <small>~10 s</small></button>
+    </div>
+    <label class="toggle"><input type="checkbox" id="show-errs" checked> show error exits</label>
+    <label class="toggle"><input type="checkbox" id="hide-off"> hide lines that don't run</label>
+  </div>
+
+  <div class="layout">
+    <section class="card treebox" aria-label="Call tree"><ul class="tree" id="tree"></ul></section>
+    <aside class="card summary" id="summary" aria-live="polite"></aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  const LAYER = {
+    ext: ["outside the code", "--l-ext"], entry: ["main.py", "--l-entry"], router: ["router", "--l-router"],
+    schema: ["schema", "--l-schema"], core: ["core", "--l-core"], service: ["service", "--l-service"],
+    data: ["repository", "--l-data"], client: ["client", "--l-client"],
+  };
+  const ALL = ["A", "B1", "B2"], NEW = ["A", "B2"], ARX = ["B1", "B2"];
+
+  // n(file, layer, fn, by, opts, children)
+  function n(file, layer, fn, by, o, kids) { return Object.assign({ file, layer, fn, by, kids: kids || [], on: ALL }, o || {}); }
+  function phase(fn, o, kids) { return Object.assign({ phase: true, fn, kids: kids || [], on: ALL }, o || {}); }
+
+  const TREE = [
+    n("uvicorn", "ext", "receives POST /extract", "the client (curl, /docs, smoke test)", { note: "Starts handling the request on the event loop." }, [
+      n("main.py", "entry", "app", "uvicorn, for every request", { note: "Finds the route. /extract exists because main.py ran app.include_router(extraction.router) at startup." }, [
+        n("routers/extraction.py", "router", "extract(request, service)", "FastAPI, because @router.post(\"/extract\") matches", { code: "async def extract(request: ResearchRequest,\n                  service: IngestionService = Depends(get_ingestion_service)):" }, [
+
+          phase("before the route body runs, FastAPI fills both parameters", {}, [
+            n("schemas/extraction.py", "schema", "ResearchRequest", "FastAPI, for the parameter  request: ResearchRequest", {
+              note: "Reads the JSON body and validates it.", errs: [["422", "bad body, e.g. \"abstract\": \"\" (min_length=1)"]] }),
+            n("core/dependencies.py", "core", "get_ingestion_service(repository)", "FastAPI, for  Depends(get_ingestion_service)", { note: "Needs a repository first, so FastAPI resolves that one before running this." }, [
+              n("core/dependencies.py", "core", "get_document_repository(db)", "Depends(get_document_repository)", { note: "Needs a session first." }, [
+                n("core/database.py", "core", "get_db()", "Depends(get_db)", { tags: [["wait", "yield"]], code: "async with SessionLocal() as session:\n    yield session   # pauses here until the response is sent" }),
+                n("repositories/document_repository.py", "data", "DocumentRepository.__init__(session)", "return DocumentRepository(db)", { note: "Stores the session: self.session = session" }),
+              ]),
+              n("services/ingestion_service.py", "service", "IngestionService.__init__(repository)", "return IngestionService(repository)", { note: "Stores the repository: self.repository = repository. Nothing else runs yet." }),
+            ]),
+          ]),
+
+          n("services/ingestion_service.py", "service", "IngestionService.extract(abstract, arxiv_id)", "the route body:  return await service.extract(...)", { tags: [["wait", "await"]] }, [
+            n("services/ingestion_service.py", "service", "exactly-one-input rule", "extract(), first line", {
+              code: "if (abstract is None) == (arxiv_id is None):\n    raise InvalidExtractionRequestError(...)", errs: [["400", "InvalidExtractionRequestError: both or neither given"]] }),
+
+            n("services/ingestion_service.py", "service", "branch A: pasted abstract", "if abstract is not None:", { on: ["A"],
+              code: "title = None; category = None\nsource_type = \"manual\"\nsource_identifier = f\"manual:{uuid4()}\"", note: "No metadata for pasted text. The uuid makes every paste unique, so no duplicate check." }),
+
+            n("services/ingestion_service.py", "service", "branch B: arXiv ID", "else:", { on: ARX }, [
+              n("repositories/document_repository.py", "data", "find_latest_extraction(\"arxiv\", arxiv_id)", "previous = await self.repository.find_latest_extraction(\"arxiv\", arxiv_id)", { on: ARX, tags: [["wait", "await"]] }, [
+                n("repositories/document_repository.py", "data", "build the query", "find_latest_extraction()", { on: ARX,
+                  code: "select(Extraction).join(Document).join(Source)\n  .where(Source.source_type == \"arxiv\",\n         Source.source_identifier == arxiv_id)\n  .order_by(Extraction.id.desc()).limit(1)" }),
+                n("PostgreSQL", "ext", "SELECT … JOIN … LIMIT 1", "await self.session.execute(query)", { on: ARX, tags: [["wait", "await"]] }),
+                n("repositories/document_repository.py", "data", "result.scalar_one_or_none()", "find_latest_extraction()", { on: ARX, note: "Returns the stored Extraction, or None." }),
+              ]),
+
+              n("services/ingestion_service.py", "service", "B1: already saved → answer from the database", "if previous is not None:", { on: ["B1"], tags: [["time", "returns early"]] }, [
+                n("schemas/extraction.py", "schema", "ExtractionResponse.model_validate(previous)", "stored = ExtractionResponse.model_validate(previous)", { on: ["B1"], note: "parse_key_entities turns the stored JSON text back into a list." }),
+                n("schemas/extraction.py", "schema", "ResearchExtraction(summary, key_entities)", "return ResearchExtraction(...)", { on: ["B1"], note: "Goes straight back to the route. Nothing below runs." }),
+              ]),
+
+              n("clients/arxiv_client.py", "client", "fetch_arxiv_paper(arxiv_id)", "paper = await asyncio.to_thread(fetch_arxiv_paper, arxiv_id)", { on: ["B2"], tags: [["thread", "worker thread"], ["wait", "await"]],
+                errs: [["404", "ArxivPaperNotFoundError: no paper, or no abstract"], ["400", "InvalidArxivIdError: arXiv answered 400 (\"not-an-id\")"], ["502", "ArxivUnavailableError: network error, timeout, broken XML"]] }, [
+                n("core/config.py", "core", "get_settings().arxiv_api_base_url", "url = f\"{get_settings().arxiv_api_base_url}?{params}\"", { on: ["B2"], note: "Cached Settings, read from .env at startup." }),
+                n("arXiv API", "ext", "GET export.arxiv.org/api/query?id_list=…", "urlopen(url, timeout=15)", { on: ["B2"], note: "Returns Atom XML." }),
+                n("clients/arxiv_client.py", "client", "parse XML", "ET.fromstring(xml_data)", { on: ["B2"], note: "entry → <summary> (abstract), <title>, <arxiv:primary_category term>." }),
+                n("clients/arxiv_client.py", "client", "return ArxivPaper(abstract, title, category)", "fetch_arxiv_paper()", { on: ["B2"] }),
+              ]),
+            ]),
+
+            n("clients/llm_client.py", "client", "extract_research(abstract)", "result, token_count, latency = await asyncio.to_thread(extract_research, abstract)", { on: NEW, tags: [["thread", "worker thread"], ["wait", "await"], ["time", "~10 s"]],
+              errs: [["500", "LLMNotConfiguredError: OPENROUTER_API_KEY missing or empty"], ["502", "LLMExtractionError: call failed or 3 unusable answers"]] }, [
+              n("core/config.py", "core", "get_settings()", "settings = get_settings()", { on: NEW, note: "Key, base URL and model name." }),
+              n("clients/llm_client.py", "client", "OpenAI(base_url, api_key, timeout=60, max_retries=3)", "client = OpenAI(...)", { on: NEW }),
+              n("OpenRouter LLM", "ext", "chat.completions.create(model, messages)", "for attempt in 1..3:", { on: NEW, tags: [["time", "slowest step"]], note: "System prompt asks for JSON with summary + key_entities." }),
+              n("schemas/extraction.py", "schema", "ResearchExtraction.model_validate(data)", "result = ResearchExtraction.model_validate(json.loads(content))", { on: NEW, note: "Bad JSON or wrong shape → ValueError → next attempt." }),
+              n("clients/llm_client.py", "client", "return result, token_count, latency", "extract_research()", { on: NEW }),
+            ]),
+
+            n("repositories/document_repository.py", "data", "save_extraction(...)", "await self.repository.save_extraction(source_type=..., ..., latency=latency)", { on: NEW, tags: [["wait", "await"]],
+              note: "One transaction: all three rows or none." }, [
+              n("PostgreSQL", "ext", "INSERT INTO sources", "session.add(Source(...)); await session.flush()", { on: NEW, tags: [["wait", "await"]], note: "flush sends the INSERT so source.id is known." }),
+              n("PostgreSQL", "ext", "INSERT INTO documents", "session.add(Document(source_id=source.id, ...)); await session.flush()", { on: NEW, tags: [["wait", "await"]] }),
+              n("PostgreSQL", "ext", "INSERT INTO extractions", "session.add(Extraction(..., key_entities=json.dumps(...), review_status=PENDING))", { on: NEW }),
+              n("PostgreSQL", "ext", "COMMIT", "await self.session.commit()", { on: NEW, tags: [["wait", "await"]], errs: [["—", "any error → await session.rollback(); raise (nothing is kept)"]] }),
+            ]),
+
+            n("services/ingestion_service.py", "service", "return result", "extract(), last line", { on: NEW, note: "The ResearchExtraction from the LLM goes back to the route." }),
+          ]),
+        ]),
+      ]),
+
+      phase("after the route returns", {}, [
+        n("FastAPI", "ext", "response_model=ResearchExtraction → JSON", "@router.post(..., response_model=ResearchExtraction)", { note: "Checks the shape and serializes it." }),
+        n("uvicorn", "ext", "sends 200 OK", "FastAPI", { code: "{\"summary\": \"...\", \"key_entities\": [\"...\", \"...\"]}" }),
+        n("core/database.py", "core", "get_db() resumes after yield", "FastAPI, after the response", { note: "Leaving async with closes the session; its connection returns to the pool." }),
+      ]),
+
+      phase("only if a SynthError was raised above", { on: [] }, [
+        n("core/error_handlers.py", "core", "synth_error_handler(request, exc)", "FastAPI, because main.py ran register_exception_handlers(app)", { on: [],
+          code: "status = ERROR_STATUS_CODES[type(exc)]   # 400 / 404 / 500 / 502\nreturn JSONResponse(status, {\"detail\": str(exc)})", note: "The session is still closed by get_db." }),
+      ]),
+    ]),
+  ];
+
+  const SC = {
+    B2: { title: "New arXiv ID", body: "{\"arxiv_id\": \"1810.04805\"}", time: "~10 s", db: "1 SELECT, 3 INSERTs, 1 COMMIT", out: "arXiv API, OpenRouter LLM", ret: "summary + key_entities from the LLM" },
+    B1: { title: "Already-saved arXiv ID", body: "{\"arxiv_id\": \"1706.03762\"}", time: "~0.003 s", db: "1 SELECT", out: "none", ret: "the stored summary + key_entities" },
+    A: { title: "Pasted abstract", body: "{\"abstract\": \"We propose ...\"}", time: "~10 s", db: "3 INSERTs, 1 COMMIT", out: "OpenRouter LLM", ret: "summary + key_entities from the LLM" },
+  };
+
+  let sc = "B2";
+  const treeEl = document.getElementById("tree");
+  const collapsed = new Set();
+  let uid = 0;
+  (function tagIds(list) { list.forEach(x => { x.id = "n" + (uid++); tagIds(x.kids); }); })(TREE);
+
+  function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+
+  function render() {
+    treeEl.textContent = "";
+    let step = 0, nodesRun = 0;
+    const hideOff = document.getElementById("hide-off").checked;
+    function build(list, parent) {
+      list.forEach(x => {
+        const runs = x.on.includes(sc);
+        if (hideOff && !runs && !x.phase) return;
+        if (hideOff && x.phase && !runs) return;
+        const li = document.createElement("li");
+        if (!runs) li.classList.add("off");
+        if (x.phase) li.classList.add("phase");
+        const node = document.createElement("div");
+        node.className = "node";
+        const caret = document.createElement("button");
+        caret.className = "caret";
+        caret.type = "button";
+        const hasKids = x.kids.length > 0;
+        caret.textContent = hasKids ? (collapsed.has(x.id) ? "▸" : "▾") : "·";
+        if (!hasKids) caret.disabled = true;
+        else { caret.setAttribute("aria-label", (collapsed.has(x.id) ? "Expand " : "Collapse ") + x.fn); caret.addEventListener("click", () => { collapsed.has(x.id) ? collapsed.delete(x.id) : collapsed.add(x.id); render(); }); }
+        node.appendChild(caret);
+        const body = document.createElement("div");
+        body.className = "body";
+        let head = "";
+        if (x.phase) {
+          head = `<span class="fn">${esc(x.fn)}</span>`;
+        } else {
+          if (runs) { step++; nodesRun++; }
+          const [lname, lvar] = LAYER[x.layer];
+          head = `${runs ? `<span class="step">${step}</span>` : ""}<span class="file" style="color:var(${lvar})">${esc(x.file)}</span><span class="fn">${esc(x.fn)}</span>${(x.tags || []).map(([k, t]) => `<span class="tag ${k}">${esc(t)}</span>`).join("")}`;
+        }
+        let html = `<div class="head">${head}</div>`;
+        if (x.by) html += `<div class="by">called by <code>${esc(x.by)}</code></div>`;
+        if (x.note) html += `<div class="note">${esc(x.note)}</div>`;
+        if (x.code) html += `<div class="code">${esc(x.code)}</div>`;
+        if (x.errs) html += `<div class="errs">${x.errs.map(([c, m]) => `<div class="errline"><b>${c === "—" ? "✕" : "→ " + c}</b> ${esc(m)}</div>`).join("")}</div>`;
+        body.innerHTML = html;
+        node.appendChild(body);
+        li.appendChild(node);
+        if (hasKids && !collapsed.has(x.id)) {
+          const ul = document.createElement("ul");
+          build(x.kids, ul);
+          if (ul.children.length) li.appendChild(ul);
+        }
+        parent.appendChild(li);
+      });
+    }
+    build(TREE, treeEl);
+    renderSummary(nodesRun);
+  }
+
+  function renderSummary(count) {
+    const s = SC[sc];
+    document.getElementById("summary").innerHTML = `
+      <div class="eyebrow">This request</div>
+      <h2>${esc(s.title)}</h2>
+      <div class="req">POST /extract\n${esc(s.body)}</div>
+      <div><div class="big">${esc(s.time)}</div><div class="lede" style="font-size:13px">${count} numbered steps run</div></div>
+      <dl>
+        <dt>Database</dt><dd>${esc(s.db)}</dd>
+        <dt>Outside calls</dt><dd>${esc(s.out)}</dd>
+        <dt>Returns</dt><dd>${esc(s.ret)}</dd>
+      </dl>
+      <div class="legend">
+        <span><span class="dotl" style="background:var(--l-router)"></span>router</span>
+        <span><span class="dotl" style="background:var(--l-service)"></span>service</span>
+        <span><span class="dotl" style="background:var(--l-data)"></span>repository</span>
+        <span><span class="dotl" style="background:var(--l-client)"></span>client</span>
+        <span><span class="dotl" style="background:var(--l-schema)"></span>schema</span>
+        <span><span class="dotl" style="background:var(--l-core)"></span>core</span>
+        <span><span class="dotl" style="background:var(--l-ext)"></span>outside the code</span>
+      </div>
+      <p class="lede" style="font-size:12.5px"><b style="color:var(--hot)">await</b>: this request pauses and the server serves others. <b style="color:var(--l-client)">worker thread</b>: blocking code moved off the event loop. Within one request, steps never run at the same time.</p>`;
+  }
+
+  document.querySelectorAll("[data-sc]").forEach(b => b.addEventListener("click", () => {
+    sc = b.dataset.sc;
+    document.querySelectorAll("[data-sc]").forEach(x => x.setAttribute("aria-pressed", x === b ? "true" : "false"));
+    render();
+  }));
+  document.getElementById("show-errs").addEventListener("change", e => treeEl.classList.toggle("noerrs", !e.target.checked));
+  document.getElementById("hide-off").addEventListener("change", render);
+  render();
+})();
+</script>
