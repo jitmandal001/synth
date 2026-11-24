@@ -40,4 +40,11 @@ def config_check(request: Request, settings: Settings = Depends(get_settings)):
             "api_key_configured": api_key is not None and bool(api_key.get_secret_value()),
         },
         "arxiv_api_base_url": settings.arxiv_api_base_url,
+                # Level 3: token settings, but never the signing key itself.
+        "auth": {
+            "jwt_algorithm": settings.jwt_algorithm,
+            "access_token_minutes": settings.access_token_minutes,
+            "refresh_token_days": settings.refresh_token_days,
+            "jwt_secret_key_configured": bool(settings.jwt_secret_key.get_secret_value()),
+        },
     }

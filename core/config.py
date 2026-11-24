@@ -34,7 +34,16 @@ class Settings(BaseSettings):
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     llm_model: str = "openrouter/free"
     arxiv_api_base_url: str = "https://export.arxiv.org/api/query"
+    
+    # Level 3: signs access tokens (JWT). Required: anyone with this key could
+    # forge a token for any user, so it lives in .env as a SecretStr.
+    jwt_secret_key: SecretStr
+    jwt_algorithm: str = "HS256"        # HMAC-SHA256: one secret both signs and verifies
 
+    # Level 3: token lifetimes. Short access token (can't be revoked early),
+    # long refresh token (stored in the DB, so it can be revoked).
+    access_token_minutes: int = 15
+    refresh_token_days: int = 7
 
 @lru_cache
 def get_settings() -> Settings:
