@@ -1,0 +1,342 @@
+<title>Synth Database Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600&display=swap">
+<style>
+/* Layout: an entity-relationship sheet — auth tables on the left, content tables on the right, users in the middle joining both; detail rail below. */
+:root {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --ink: #17202b;
+  --muted: #5c6776;
+  --line: #d8dee7;
+  --soft: #edf0f5;
+  --edge: #9aa6b6;
+  --hot: #d2551f;
+  --auth: #b8326b;
+  --auth-bg: #fbeef4;
+  --content: #0e7f72;
+  --content-bg: #e9f6f4;
+  --hub: #1f4fa8;
+  --hub-bg: #ecf1fb;
+  --pk: #a8710e;
+  --fk: #1f5fbf;
+  --uq: #7748c0;
+  --font-display: "Space Grotesk", "Segoe UI", system-ui, sans-serif;
+  --font-body: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0f141a; --surface: #161c24; --ink: #e5eaf1; --muted: #9aa5b4; --line: #2a323e; --soft: #1d242e; --edge: #5a6678;
+    --hot: #ff8a57; --auth: #f07aa8; --auth-bg: #2a1a22; --content: #4fc7b7; --content-bg: #14262a; --hub: #7ea7ff; --hub-bg: #18213a;
+    --pk: #e6b04f; --fk: #7ea7ff; --uq: #b998f2;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0f141a; --surface: #161c24; --ink: #e5eaf1; --muted: #9aa5b4; --line: #2a323e; --soft: #1d242e; --edge: #5a6678;
+  --hot: #ff8a57; --auth: #f07aa8; --auth-bg: #2a1a22; --content: #4fc7b7; --content-bg: #14262a; --hub: #7ea7ff; --hub-bg: #18213a;
+  --pk: #e6b04f; --fk: #7ea7ff; --uq: #b998f2;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 15px; line-height: 1.5; }
+.wrap {
+  max-width: 1240px; margin: 0 auto;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 28px 56px;
+  display: flex; flex-direction: column; gap: 18px;
+}
+.eyebrow { font: 500 12px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+h1 { font-family: var(--font-display); font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0; letter-spacing: -.01em; }
+h2 { font-family: var(--font-display); font-size: 18px; margin: 0; }
+p { margin: 0; }
+.lede { color: var(--muted); max-width: 72ch; }
+code { font-family: var(--font-mono); font-size: .88em; }
+.stats { display: flex; flex-wrap: wrap; gap: 8px; }
+.stat { font: 500 12.5px var(--font-mono); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; color: var(--muted); }
+.stat b { color: var(--ink); font-weight: 600; }
+
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.controls .label { font: 500 12px var(--font-mono); color: var(--muted); margin-right: 2px; }
+.btn { font: 500 13.5px var(--font-body); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 7px 13px; cursor: pointer; }
+.btn[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+.btn:focus-visible, .tbl:focus-visible { outline: 2px solid var(--hot); outline-offset: 3px; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; }
+.map { overflow-x: auto; }
+.map svg { display: block; min-width: 980px; width: 100%; height: auto; }
+.tbl { cursor: pointer; }
+.tbl .frame { fill: var(--surface); stroke: var(--line); stroke-width: 1.2; }
+.tbl.sel .frame { stroke: var(--ink); stroke-width: 2.4; }
+.tbl .tname { font: 600 13px var(--font-mono); }
+.tbl .rows { font: 500 10px var(--font-mono); fill: var(--muted); }
+.tbl .cname { font: 500 11.5px var(--font-mono); fill: var(--ink); }
+.tbl .ctype { font: 400 10.5px var(--font-mono); fill: var(--muted); }
+.tbl .badge { font: 700 8.5px var(--font-mono); }
+.tbl .new { font: 700 8.5px var(--font-mono); fill: var(--auth); }
+.dim { opacity: .2; }
+.rel { fill: none; stroke: var(--edge); stroke-width: 1.6; }
+.rel.hot { stroke: var(--hot); stroke-width: 2.6; }
+.card-label { font: 700 10px var(--font-mono); fill: var(--muted); }
+.card-label.hot { fill: var(--hot); }
+.zone { font: 600 11px var(--font-mono); letter-spacing: .08em; fill: var(--muted); }
+.stepdot { fill: var(--hot); }
+.stepnum { font: 700 11px var(--font-mono); fill: var(--surface); }
+
+.legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12.5px; color: var(--muted); padding: 10px 14px; border-top: 1px solid var(--line); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.lb { font: 700 9.5px var(--font-mono); border: 1px solid currentColor; border-radius: 4px; padding: 0 4px; }
+.sw { width: 12px; height: 12px; border-radius: 3px; display: inline-block; border: 1.5px solid currentColor; }
+
+.below { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 16px; }
+@media (max-width: 900px) { .below { grid-template-columns: minmax(0, 1fr); } }
+.panel { padding: 18px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.cols { width: 100%; border-collapse: collapse; font-size: 13px; }
+.cols td, .cols th { text-align: left; padding: 5px 8px; border-top: 1px solid var(--line); vertical-align: top; }
+.cols th { font: 600 11px var(--font-mono); color: var(--muted); text-transform: uppercase; border-top: 0; }
+.cols td:first-child { font-family: var(--font-mono); font-size: 12px; white-space: nowrap; }
+.cols td.t { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+.tablewrap { overflow-x: auto; }
+.chip { display: inline-flex; font: 600 11.5px var(--font-mono); padding: 1px 9px; border-radius: 999px; border: 1.5px solid currentColor; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.steps code { font-size: 12px; }
+.kv { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 12px; font-size: 13.5px; }
+.kv dt { color: var(--muted); }
+.kv dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:8px">
+    <div class="eyebrow">synth_db · alembic head 618bb3862d38 · level-3-auth</div>
+    <h1>Synth Database Map</h1>
+    <p class="lede">All 9 tables in your Postgres database, read from the live schema. Lines are foreign keys: <b>1</b> marks the side with one row, <b>N</b> the side with many. Click a table, or trace how a request walks the tables.</p>
+    <div class="stats">
+      <span class="stat"><b>9</b> tables (+ alembic_version)</span>
+      <span class="stat"><b>5</b> new in Level 3</span>
+      <span class="stat"><b>9</b> foreign keys</span>
+      <span class="stat">rows: <b>3</b> documents · <b>0</b> users · <b>0</b> roles (seeded in Step 3)</span>
+    </div>
+  </header>
+
+  <div class="controls" role="group" aria-label="Show">
+    <span class="label">SHOW</span>
+    <button class="btn" id="v-all" data-view="all" aria-pressed="true">All tables</button>
+    <button class="btn" id="v-auth" data-view="auth" aria-pressed="false">Level 3 auth</button>
+    <button class="btn" id="v-content" data-view="content" aria-pressed="false">Levels 1–2 content</button>
+    <span class="label" style="margin-left:8px">TRACE</span>
+    <button class="btn" id="v-perm" data-view="perm" aria-pressed="false">Can this user ingest?</button>
+    <button class="btn" id="v-refresh" data-view="refresh" aria-pressed="false">Refresh-token chain</button>
+    <button class="btn" id="v-extract" data-view="extract" aria-pressed="false">Who ingested this paper?</button>
+  </div>
+
+  <section class="card" aria-label="Table diagram">
+    <div class="map"><svg id="er" viewBox="0 0 1170 800" role="img" aria-label="Entity relationship diagram of synth_db"></svg></div>
+    <div class="legend">
+      <span><span class="sw" style="color:var(--auth)"></span>auth (Level 3)</span>
+      <span><span class="sw" style="color:var(--hub)"></span>users (joins both)</span>
+      <span><span class="sw" style="color:var(--content)"></span>content (Levels 1–2)</span>
+      <span><span class="lb" style="color:var(--pk)">PK</span>primary key</span>
+      <span><span class="lb" style="color:var(--fk)">FK</span>foreign key</span>
+      <span><span class="lb" style="color:var(--uq)">UQ</span>unique</span>
+      <span><span class="lb" style="color:var(--auth)">NEW</span>added in Step 2</span>
+    </div>
+  </section>
+
+  <div class="below">
+    <section class="card panel" id="detail" aria-live="polite"></section>
+    <section class="card panel" id="side" aria-live="polite"></section>
+  </div>
+</div>
+
+<script>
+(function () {
+  const W = 236, HEAD = 34, ROW = 21;
+  const T = {
+    permissions: { x: 24, y: 40, g: "auth", rows: 0, step: "Step 3 seeds 5 rows",
+      what: "One row per action a user may take, named action:resource.",
+      cols: [["PK", "id", "int"], ["UQ", "name", "varchar(100)"]], ex: "ingest:document, read:document, review:extraction, manage:users, view:config" },
+    role_permissions: { x: 24, y: 220, g: "auth", rows: 0, step: "Step 3 seeds the links",
+      what: "Link table: this role grants this permission. No id; the pair is the key, so a link can't be stored twice.",
+      cols: [["PK FK", "role_id", "→ roles"], ["PK FK", "permission_id", "→ permissions"]] },
+    roles: { x: 24, y: 400, g: "auth", rows: 0, step: "Step 3 seeds 3 rows",
+      what: "A named bundle of permissions.",
+      cols: [["PK", "id", "int"], ["UQ", "name", "varchar(50)"]], ex: "contributor, curator, admin" },
+    user_roles: { x: 300, y: 400, g: "auth", rows: 0, step: "create_admin.py (Step 6), admin endpoints (Step 8)",
+      what: "Link table: this user has this role. One user can hold several roles.",
+      cols: [["PK FK", "user_id", "→ users"], ["PK FK", "role_id", "→ roles"]] },
+    refresh_tokens: { x: 300, y: 40, g: "auth", rows: 0, step: "every login and refresh (Step 6)",
+      what: "Every refresh token ever issued. Only the SHA-256 hash is stored, so a leaked table can't be used to log in.",
+      cols: [["PK", "id", "int"], ["FK", "user_id", "→ users, idx"], ["UQ", "token_hash", "varchar(64)"], ["", "family_id", "uuid, idx"], ["", "created_at", "timestamptz"], ["", "expires_at", "timestamptz"], ["", "revoked_at", "null = valid"], ["FK", "replaced_by_id", "→ self"]] },
+    users: { x: 580, y: 360, g: "hub", rows: 0, step: "create_admin.py (Step 6), admin endpoints (Step 8)",
+      what: "One row per person. Connects the auth tables (who you are, what you may do) to the content tables (what you ingested).",
+      cols: [["PK", "id", "int"], ["UQ", "email", "varchar(255)"], ["", "created_at", "timestamptz"], ["NEW", "hashed_password", "varchar(255)"], ["NEW", "is_active", "bool = true"]] },
+    sources: { x: 900, y: 40, g: "content", rows: 3, step: "POST /extract (save_extraction)",
+      what: "Where an abstract came from: an arXiv ID or a manual paste. user_id is still NULL until Level 3 fills it.",
+      cols: [["PK", "id", "int"], ["FK", "user_id", "→ users, null"], ["", "source_type", "varchar(50)"], ["", "source_identifier", "varchar(500)"], ["", "created_at", "timestamptz"]], note: "UNIQUE (source_type, source_identifier)" },
+    documents: { x: 900, y: 250, g: "content", rows: 3, step: "POST /extract (save_extraction)",
+      what: "The paper: abstract, title, category. Exactly one per source.",
+      cols: [["PK", "id", "int"], ["FK UQ", "source_id", "→ sources"], ["", "title", "varchar(500)"], ["", "abstract", "text"], ["", "category", "varchar(100)"], ["", "created_at", "timestamptz"]] },
+    extractions: { x: 900, y: 500, g: "content", rows: 3, step: "POST /extract (save_extraction)",
+      what: "The LLM output for a document, with cost and speed, and a review status curators will change in Step 8.",
+      cols: [["PK", "id", "int"], ["FK", "document_id", "→ documents"], ["", "summary", "text"], ["", "key_entities", "text (JSON)"], ["", "token_count", "int"], ["", "latency", "float"], ["", "review_status", "enum"], ["", "created_at", "timestamptz"]] },
+  };
+  Object.values(T).forEach(t => { t.h = HEAD + t.cols.length * ROW + 8; });
+
+  // [child, fkColumn, parent, onDelete, card] card: "1N" (parent 1, child N) or "11"
+  const R = [
+    ["role_permissions", "permission_id", "permissions", "CASCADE", "1N"],
+    ["role_permissions", "role_id", "roles", "CASCADE", "1N"],
+    ["user_roles", "role_id", "roles", "CASCADE", "1N"],
+    ["user_roles", "user_id", "users", "CASCADE", "1N"],
+    ["refresh_tokens", "user_id", "users", "CASCADE", "1N"],
+    ["refresh_tokens", "replaced_by_id", "refresh_tokens", "", "11"],
+    ["sources", "user_id", "users", "", "1N"],
+    ["documents", "source_id", "sources", "", "11"],
+    ["extractions", "document_id", "documents", "", "1N"],
+  ];
+
+  const VIEWS = {
+    all: null,
+    auth: { tables: ["permissions", "role_permissions", "roles", "user_roles", "refresh_tokens", "users"] },
+    content: { tables: ["users", "sources", "documents", "extractions"] },
+    perm: { tables: ["users", "user_roles", "roles", "role_permissions", "permissions"], order: ["users", "user_roles", "roles", "role_permissions", "permissions"],
+      rels: [["user_roles", "users"], ["user_roles", "roles"], ["role_permissions", "roles"], ["role_permissions", "permissions"]],
+      title: "Can user 7 run POST /extract?",
+      steps: ["Start at <code>users</code> with the id from the access token (sub = 7).", "<code>user_roles</code>: which roles does user 7 have? → role 1 (contributor).", "<code>roles</code>: role 1 is \"contributor\".", "<code>role_permissions</code>: which permissions does role 1 grant?", "<code>permissions</code>: names → {read:document, ingest:document}. Contains ingest:document → allowed. Missing → 403."],
+      sql: "SELECT p.name FROM users u\nJOIN user_roles ur ON ur.user_id = u.id\nJOIN role_permissions rp ON rp.role_id = ur.role_id\nJOIN permissions p ON p.id = rp.permission_id\nWHERE u.id = 7;" },
+    refresh: { tables: ["users", "refresh_tokens"], order: ["users", "refresh_tokens"], rels: [["refresh_tokens", "users"], ["refresh_tokens", "refresh_tokens"]],
+      title: "One login, three refreshes",
+      steps: ["Login inserts R1 with a new <code>family_id</code>; <code>revoked_at</code> is NULL.", "Refresh with R1: set R1.<code>revoked_at</code>, insert R2 in the same family, R1.<code>replaced_by_id</code> = R2.", "Refresh with R2 → R3, same pattern.", "Someone replays R1: its <code>revoked_at</code> is already set → reuse detected.", "Revoke the whole family: <code>UPDATE … SET revoked_at = now() WHERE family_id = …</code>."],
+      sql: "id  family_id  revoked_at   replaced_by_id\n 1  a3f…       10:15        2   ← R1 (used)\n 2  a3f…       10:30        3   ← R2 (used)\n 3  a3f…       NULL         NULL ← R3 (current)" },
+    extract: { tables: ["extractions", "documents", "sources", "users"], order: ["extractions", "documents", "sources", "users"], rels: [["extractions", "documents"], ["documents", "sources"], ["sources", "users"]],
+      title: "Who ingested extraction 4?",
+      steps: ["<code>extractions</code> id 4 → document_id 4.", "<code>documents</code> id 4 → source_id 8 (ResNet).", "<code>sources</code> id 8 → user_id. Today it's NULL; from Step 8 POST /extract fills it with the logged-in user.", "<code>users</code> → the person's email."],
+      sql: "SELECT u.email FROM extractions e\nJOIN documents d ON d.id = e.document_id\nJOIN sources s ON s.id = d.source_id\nLEFT JOIN users u ON u.id = s.user_id\nWHERE e.id = 4;" },
+  };
+
+  const NS = "http://www.w3.org/2000/svg";
+  const svg = document.getElementById("er");
+  function el(t, a, p) { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); if (p) p.appendChild(e); return e; }
+  const gcol = { auth: "--auth", hub: "--hub", content: "--content" };
+  const gbg = { auth: "--auth-bg", hub: "--hub-bg", content: "--content-bg" };
+  const colY = (t, name) => t.y + HEAD + t.cols.findIndex(c => c[1] === name) * ROW + ROW / 2 + 2;
+  const idY = t => colY(t, "id") || (t.y + HEAD + ROW / 2 + 2);
+
+  el("text", { x: 24, y: 24, class: "zone" }, svg).textContent = "AUTH · LEVEL 3";
+  el("text", { x: 900, y: 24, class: "zone" }, svg).textContent = "CONTENT · LEVELS 1–2";
+
+  const gR = el("g", {}, svg), gT = el("g", {}, svg), gS = el("g", {}, svg);
+  let selected = "users", view = "all";
+
+  function relPath(r) {
+    const [c, fk, p] = r, tc = T[c], tp = T[p];
+    const cy = colY(tc, fk);
+    if (c === p) {
+      const y2 = idY(tp), xr = tc.x + W;
+      return { d: `M${xr} ${cy}C${xr + 50} ${cy} ${xr + 50} ${y2} ${xr} ${y2}`, a: [xr + 6, cy], b: [xr + 6, y2] };
+    }
+    const py = tp.cols.some(x => x[1] === "id") ? idY(tp) : tp.y + HEAD + 12;
+    const ccx = tc.x + W / 2, pcx = tp.x + W / 2;
+    if (Math.abs(ccx - pcx) < 10) {
+      const x = tc.x;
+      return { d: `M${x} ${cy}C${x - 22} ${cy} ${x - 22} ${py} ${x} ${py}`, a: [x - 8, cy], b: [x - 8, py] };
+    }
+    const fromRight = ccx < pcx;
+    const x1 = fromRight ? tc.x + W : tc.x, x2 = fromRight ? tp.x : tp.x + W;
+    const dx = Math.max(40, Math.abs(x2 - x1) / 2) * (fromRight ? 1 : -1);
+    return { d: `M${x1} ${cy}C${x1 + dx} ${cy} ${x2 - dx} ${py} ${x2} ${py}`, a: [x1 + (fromRight ? 8 : -8), cy], b: [x2 + (fromRight ? -8 : 8), py] };
+  }
+
+  function draw() {
+    gR.textContent = ""; gT.textContent = ""; gS.textContent = "";
+    const v = VIEWS[view];
+    const onT = v ? new Set(v.tables) : null;
+    const hotPairs = v && v.rels ? new Set(v.rels.map(([a, b]) => a + ">" + b)) : null;
+    const selRels = !v ? new Set(R.filter(r => r[0] === selected || r[2] === selected).map(r => r[0] + ">" + r[2])) : null;
+
+    R.forEach(r => {
+      const key = r[0] + ">" + r[2];
+      const { d, a, b } = relPath(r);
+      const hot = hotPairs ? hotPairs.has(key) : selRels.has(key);
+      const show = !onT || (onT.has(r[0]) && onT.has(r[2]));
+      const path = el("path", { d, class: "rel" + (hot ? " hot" : "") }, gR);
+      if (!show || (hotPairs && !hot)) path.classList.add("dim");
+      const lc = "card-label" + (hot ? " hot" : "");
+      const t1 = el("text", { x: a[0], y: a[1] - 5, "text-anchor": "middle", class: lc }, gR); t1.textContent = r[4] === "11" ? "1" : "N";
+      const t2 = el("text", { x: b[0], y: b[1] - 5, "text-anchor": "middle", class: lc }, gR); t2.textContent = "1";
+      if (!show || (hotPairs && !hot)) { t1.classList.add("dim"); t2.classList.add("dim"); }
+    });
+
+    Object.entries(T).forEach(([name, t]) => {
+      const g = el("g", { class: "tbl" + (name === selected && !v ? " sel" : ""), tabindex: 0, role: "button", "aria-label": `Table ${name}` }, gT);
+      if (onT && !onT.has(name)) g.classList.add("dim");
+      el("rect", { x: t.x, y: t.y, width: W, height: t.h, rx: 9, class: "frame" }, g);
+      el("path", { d: `M${t.x} ${t.y + 9}a9 9 0 0 1 9 -9h${W - 18}a9 9 0 0 1 9 9v${HEAD - 9}h${-W}z`, fill: `var(${gbg[t.g]})` }, g);
+      el("rect", { x: t.x, y: t.y + 8, width: 4, height: HEAD - 16, rx: 2, fill: `var(${gcol[t.g]})` }, g);
+      const tn = el("text", { x: t.x + 12, y: t.y + 22, class: "tname", fill: `var(${gcol[t.g]})` }, g); tn.textContent = name;
+      const rc = el("text", { x: t.x + W - 10, y: t.y + 22, "text-anchor": "end", class: "rows" }, g); rc.textContent = `${t.rows} rows`;
+      t.cols.forEach(([k, c, ty], i) => {
+        const y = t.y + HEAD + i * ROW + ROW / 2 + 6;
+        if (i) el("line", { x1: t.x + 8, x2: t.x + W - 8, y1: y - 15, y2: y - 15, stroke: "var(--soft)" }, g);
+        let bx = t.x + 10;
+        k.split(" ").filter(Boolean).forEach(b => {
+          const cls = b === "NEW" ? "new" : "badge";
+          const fill = b === "PK" ? "var(--pk)" : b === "FK" ? "var(--fk)" : b === "UQ" ? "var(--uq)" : "var(--auth)";
+          const bt = el("text", { x: bx, y, class: cls, fill }, g); bt.textContent = b; bx += b.length * 6 + 4;
+        });
+        const nx = Math.max(t.x + 46, bx + 2);
+        el("text", { x: nx, y, class: "cname" }, g).textContent = c;
+        el("text", { x: t.x + W - 10, y, "text-anchor": "end", class: "ctype" }, g).textContent = ty;
+      });
+      g.addEventListener("click", () => { setView("all"); selected = name; draw(); });
+      g.addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setView("all"); selected = name; draw(); } });
+    });
+
+    if (v && v.order) v.order.forEach((name, i) => {
+      const t = T[name];
+      el("circle", { cx: t.x + W - 4, cy: t.y + 2, r: 10, class: "stepdot" }, gS);
+      el("text", { x: t.x + W - 4, y: t.y + 6, "text-anchor": "middle", class: "stepnum" }, gS).textContent = i + 1;
+    });
+    renderPanels();
+  }
+
+  function esc(s) { const d = document.createElement("div"); d.textContent = s; return d.innerHTML; }
+  function renderPanels() {
+    const v = VIEWS[view];
+    const det = document.getElementById("detail"), side = document.getElementById("side");
+    if (v && v.steps) {
+      det.innerHTML = `<div class="eyebrow">Trace</div><h2>${esc(v.title)}</h2><ol class="steps">${v.steps.map(s => `<li>${s}</li>`).join("")}</ol>`;
+      side.innerHTML = `<div class="eyebrow">${view === "refresh" ? "What refresh_tokens looks like" : "The same walk as SQL"}</div><pre style="margin:0;font:12.5px/1.6 var(--font-mono);background:var(--soft);border-radius:10px;padding:12px;overflow-x:auto">${esc(v.sql)}</pre><p class="lede" style="font-size:13px">${view === "perm" ? "In Step 5 the repository runs this as one query; routes only ever ask for the permission name." : view === "refresh" ? "All three rows share one family_id, so one UPDATE revokes the whole chain." : "From Step 8, sources.user_id records who ran POST /extract."}</p>`;
+      return;
+    }
+    const t = T[selected];
+    const out = R.filter(r => r[0] === selected), inc = R.filter(r => r[2] === selected && r[0] !== selected);
+    det.innerHTML = `
+      <div class="eyebrow">Table</div>
+      <h2 style="color:var(${gcol[t.g]})">${esc(selected)}</h2>
+      <p>${esc(t.what)}</p>
+      <div class="tablewrap"><table class="cols"><thead><tr><th>Column</th><th>Type</th><th>Key</th></tr></thead><tbody>
+      ${t.cols.map(([k, c, ty]) => `<tr><td>${esc(c)}</td><td class="t">${esc(ty)}</td><td class="t">${esc(k)}</td></tr>`).join("")}
+      </tbody></table></div>
+      ${t.note ? `<p class="lede" style="font-size:13px">${esc(t.note)}</p>` : ""}
+      ${t.ex ? `<p class="lede" style="font-size:13px">Rows after Step 3: ${esc(t.ex)}</p>` : ""}`;
+    const fk = r => `<li><code>${esc(r[0])}.${esc(r[1])}</code> → <code>${esc(r[2])}.id</code>${r[3] ? ` <span class="chip" style="color:var(--auth)">ON DELETE ${r[3]}</span>` : ""}</li>`;
+    side.innerHTML = `
+      <div class="eyebrow">Connections</div>
+      <dl class="kv"><dt>Rows now</dt><dd>${t.rows}</dd><dt>Filled by</dt><dd>${esc(t.step)}</dd></dl>
+      <div><b style="font-size:13px">Points to (${out.length})</b>${out.length ? `<ul class="steps" style="list-style:disc">${out.map(fk).join("")}</ul>` : `<p class="lede" style="font-size:13px">No foreign keys of its own.</p>`}</div>
+      <div><b style="font-size:13px">Pointed to by (${inc.length})</b>${inc.length ? `<ul class="steps" style="list-style:disc">${inc.map(fk).join("")}</ul>` : `<p class="lede" style="font-size:13px">Nothing references it.</p>`}</div>`;
+  }
+
+  function setView(k) {
+    view = k;
+    document.querySelectorAll("[data-view]").forEach(b => b.setAttribute("aria-pressed", b.dataset.view === k ? "true" : "false"));
+  }
+  document.querySelectorAll("[data-view]").forEach(b => b.addEventListener("click", () => { setView(b.dataset.view); draw(); }));
+  draw();
+})();
+</script>
